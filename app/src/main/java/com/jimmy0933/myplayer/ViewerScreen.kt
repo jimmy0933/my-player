@@ -24,7 +24,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.consume
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -153,7 +152,7 @@ fun ViewerScreen(
                 factory = { ctx -> PlayerView(ctx).apply {
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    player = playbackEngine
+                    this.player = playbackEngine
                 } },
                 update = { view -> view.player = player },
                 modifier = Modifier.fillMaxSize().graphicsLayer {
@@ -366,6 +365,7 @@ private fun PlayerPlayButton(playing: Boolean, action: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Timeline(value: Float, onChange: (Float) -> Unit, size: Float, width: Float) {
     val clampedSize = PlayerMath.progressScale(size)
