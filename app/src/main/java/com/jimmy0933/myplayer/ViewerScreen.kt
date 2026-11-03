@@ -146,13 +146,14 @@ fun ViewerScreen(
         }
     }
 
+    val playbackEngine = player
     Box(Modifier.fillMaxSize().background(Background), contentAlignment = Alignment.Center) {
         if (media.isVideo) {
             AndroidView(
                 factory = { ctx -> PlayerView(ctx).apply {
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    player = this@ViewerScreen.player
+                    player = playbackEngine
                 } },
                 update = { view -> view.player = player },
                 modifier = Modifier.fillMaxSize().graphicsLayer {
