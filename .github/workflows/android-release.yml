@@ -1,0 +1,123 @@
+name: Android APK · latest release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: my-player-latest-release
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Test, sign, verify and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Compile and run player regression tests
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+
+      - name: Prepare signing key from GitHub Actions Secrets
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${KEYSTORE_BASE64:-}" && -n "${KEYSTORE_PASSWORD:-}" && -n "${KEY_ALIAS:-}" && -n "${KEY_PASSWORD:-}" ]]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/my-player-release.jks"
+            echo "MYPLAYER_KEYSTORE_PATH=$RUNNER_TEMP/my-player-release.jks" >> "$GITHUB_ENV"
+            echo "MYPLAYER_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "MYPLAYER_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "MYPLAYER_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "Using GitHub Actions signing key."
+          else
+            echo "mode=debug" >> "$GITHUB_OUTPUT"
+            echo "::warning::Actions signing Secrets unavailable in this new repo. Publishing a DEBUG-SIGNED rebuild, NOT upgrade-compatible with old release keys. Add the 4 signing Secrets to enable signed release APKs."
+          fi
+
+      - name: Build APK
+        run: |
+          if [[ "${{ steps.signing.outputs.mode }}" == "release" ]]; then
+            gradle --no-daemon --stacktrace :app:assembleRelease
+          else
+            gradle --no-daemon --stacktrace :app:assembleDebug
+          fi
+
+      - name: Verify and stage APK
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          MODE="${{ steps.signing.outputs.mode }}"
+          if [[ "$MODE" == "release" ]]; then
+            SRC=app/build/outputs/apk/release/app-release.apk
+            NAME=MyPlayer-v1.1.0-signed.apk
+          else
+            SRC=app/build/outputs/apk/debug/app-debug.apk
+            NAME=MyPlayer-v1.1.0-debug-signed.apk
+          fi
+          test -s "$SRC"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
+          cp "$SRC" "dist/$NAME"
+          sha256sum "dist/$NAME"
+          echo "apk=dist/$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publish newest release, remove all previous releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGN_MODE: ${{ steps.signing.outputs.mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v1.1.0"
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          # My Player v1.1.0 · rebuilt native Android app
+
+          Restored: gallery, video/photo browsing, search, folders, favorites, configurable playback timeline,
+          Media3 1.11.1, pinch zoom, video swipe seek, portrait/landscape controls, selection,
+          copy/move via in-app folder picker, Android-authorized deletion, MP4 seek-repair copy.
+
+          Signing mode: **$SIGN_MODE**.
+          EOF
+          if [[ "$SIGN_MODE" != "release" ]]; then
+            printf '\n**Warning:** This APK uses the GitHub Actions debug signing key. It will not update older installs signed with another key. Set KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD Secrets in this repository for stable release signing.\n' >> "$RUNNER_TEMP/release-notes.md"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk --clobber
+            gh release edit "$TAG" --title "My Player v1.1.0 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          else
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.0 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
+            if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
+              gh release delete "$old_tag" --yes --cleanup-tag
+            fi
+          done
+          echo "Published newest: $TAG ($SIGN_MODE)"
+
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## My Player Android" >> "$GITHUB_STEP_SUMMARY"
+          echo "Signing mode: ${{ steps.signing.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Latest release: https://github.com/$GITHUB_REPOSITORY/releases/latest" >> "$GITHUB_STEP_SUMMARY"
