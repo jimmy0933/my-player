@@ -98,7 +98,6 @@ private fun MyPlayerApp() {
     var operationErrors by remember { mutableStateOf(emptyList<String>()) }
     var showRepairPrompt by remember { mutableStateOf<LocalMedia?>(null) }
     var progressSize by remember { mutableFloatStateOf(PlayerMath.progressScale(prefs.getFloat("progress_size", 1f))) }
-    var progressWidth by remember { mutableFloatStateOf(PlayerMath.progressWidth(prefs.getFloat("progress_width", .96f))) }
     var progressOpacity by remember { mutableFloatStateOf(PlayerMath.progressOpacity(prefs.getFloat("progress_opacity", .72f))) }
 
     fun refresh() { refreshing++ }
@@ -274,8 +273,7 @@ private fun MyPlayerApp() {
             onDelete = { requestDelete(listOf(inViewer)) },
             onRepairMp4 = { showRepairPrompt = inViewer },
             onPlaybackSettings = { showSettings = true },
-            progressScale = progressSize, progressWidth = progressWidth,
-            progressOpacity = progressOpacity
+            progressScale = progressSize, progressOpacity = progressOpacity
         )
     } else {
         GalleryScreen(
@@ -422,16 +420,15 @@ private fun MyPlayerApp() {
 
     if (showSettings) {
         PlaybackSettingsDialog(
-            size = progressSize, width = progressWidth, opacity = progressOpacity,
+            size = progressSize, opacity = progressOpacity,
             canManage = Build.VERSION.SDK_INT >= 31 && MediaStore.canManageMedia(context),
             onDismiss = { showSettings = false },
-            onSave = { size, width, opacity ->
+            onSave = { size, opacity ->
                 progressSize = PlayerMath.progressScale(size)
-                progressWidth = PlayerMath.progressWidth(width)
                 progressOpacity = PlayerMath.progressOpacity(opacity)
                 prefs.edit().putFloat("progress_size", progressSize)
-                    .putFloat("progress_width", progressWidth)
-                    .putFloat("progress_opacity", progressOpacity).apply()
+                    .putFloat("progress_opacity", progressOpacity)
+                    .remove("progress_width").apply()
                 showSettings = false
             },
             onRequestManage = {
@@ -446,13 +443,12 @@ private fun MyPlayerApp() {
 
 @Composable
 private fun PlaybackSettingsDialog(
-    size: Float, width: Float, opacity: Float, canManage: Boolean,
+    size: Float, opacity: Float, canManage: Boolean,
     onDismiss: () -> Unit,
-    onSave: (Float, Float, Float) -> Unit,
+    onSave: (Float, Float) -> Unit,
     onRequestManage: () -> Unit
 ) {
     var scale by remember(size) { mutableFloatStateOf(size) }
-    var barWidth by remember(width) { mutableFloatStateOf(width) }
     // The control now moves in the intuitive direction: further right means
     // more transparent. Persisted values remain opacity for compatibility.
     var transparency by remember(opacity) { mutableFloatStateOf(1f - opacity) }
@@ -462,10 +458,8 @@ private fun PlaybackSettingsDialog(
         title = { Text("播放器設定") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("進度條粗細：${PlayerMath.progressThicknessDp(scale).toInt()} dp")
+                Text("進度條粗度：${PlayerMath.progressThicknessDp(scale).toInt()} dp")
                 Slider(value = scale, onValueChange = { scale = it }, valueRange = .8f..2.5f)
-                Text("進度條寬度：${(barWidth * 100).toInt()}%")
-                Slider(value = barWidth, onValueChange = { barWidth = it }, valueRange = .6f..1f)
                 Text("進度條透明度：${(transparency * 100f).toInt()}%")
                 Slider(
                     value = transparency,
@@ -484,7 +478,7 @@ private fun PlaybackSettingsDialog(
                 ) {
                     Timeline(
                         previewProgress, { previewProgress = it },
-                        scale, barWidth, 1f - transparency
+                        scale, 1f - transparency
                     )
                 }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -496,7 +490,7 @@ private fun PlaybackSettingsDialog(
                     color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(scale, barWidth, 1f - transparency) }) { Text("儲存") } },
-        dismissButton = { TextButton(onClick = { onSave(1f, .96f, .72f) }) { Text("恢復預設") } }
+        confirmButton = { TextButton(onClick = { onSave(scale, 1f - transparency) }) { Text("儲存") } },
+        dismissButton = { TextButton(onClick = { onSave(1f, .72f) }) { Text("恢復預設") } }
     )
 }

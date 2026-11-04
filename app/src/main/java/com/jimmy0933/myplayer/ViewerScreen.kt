@@ -59,7 +59,6 @@ fun ViewerScreen(
     onRepairMp4: () -> Unit,
     onPlaybackSettings: () -> Unit,
     progressScale: Float,
-    progressWidth: Float,
     progressOpacity: Float
 ) {
     val context = LocalContext.current
@@ -348,7 +347,7 @@ fun ViewerScreen(
         // disappeared with the control overlay after two seconds, making changes
         // in playback settings appear to have no effect.
         if (media.isVideo) {
-            Row(
+            Column(
                 Modifier.fillMaxWidth().align(Alignment.BottomCenter)
                     .then(
                         if (controlsVisible) Modifier.background(
@@ -358,31 +357,30 @@ fun ViewerScreen(
                         ) else Modifier
                     )
                     .navigationBarsPadding()
-                    .padding(horizontal = if (isLandscape) 12.dp else 14.dp,
-                        vertical = if (isLandscape) 2.dp else 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(
+                        horizontal = if (isLandscape) 8.dp else 10.dp,
+                        vertical = if (isLandscape) 2.dp else 4.dp
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Time labels occupy their own row so the timeline fills the
+                // entire available screen width, independent of their lengths.
                 if (controlsVisible) {
-                    Text(
-                        PlayerMath.durationLabel(currentMs),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(PlayerMath.durationLabel(currentMs), color = Color.White,
+                            style = MaterialTheme.typography.labelSmall)
+                        Text(PlayerMath.durationLabel(duration), color = Color.White,
+                            style = MaterialTheme.typography.labelSmall)
+                    }
                 }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Timeline(
-                        fraction, seekToFraction, progressScale, progressWidth,
-                        progressOpacity, controlsVisible
-                    )
-                }
-                if (controlsVisible) {
-                    Text(
-                        PlayerMath.durationLabel(duration),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
+                Timeline(
+                    fraction, seekToFraction, progressScale,
+                    progressOpacity, controlsVisible
+                )
             }
         }
 
@@ -395,7 +393,6 @@ internal fun Timeline(
     value: Float,
     onChange: (Float) -> Unit,
     size: Float,
-    width: Float,
     opacity: Float,
     controlsVisible: Boolean = true
 ) {
@@ -406,8 +403,7 @@ internal fun Timeline(
     Slider(
         value = value.coerceIn(0f, 1f),
         onValueChange = onChange,
-        modifier = Modifier.fillMaxWidth(PlayerMath.progressWidth(width))
-            .height(36.dp),
+        modifier = Modifier.fillMaxWidth().height(36.dp),
         colors = SliderDefaults.colors(
             thumbColor = played,
             activeTrackColor = played,

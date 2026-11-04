@@ -23,8 +23,6 @@ class PlayerMathTest {
     @Test fun settingsBoundaries() {
         assertEquals(.8f, PlayerMath.progressScale(0f))
         assertEquals(2.5f, PlayerMath.progressScale(5f))
-        assertEquals(.96f, PlayerMath.progressWidth(Float.NaN))
-        assertEquals(.6f, PlayerMath.progressWidth(.2f))
         assertEquals(.15f, PlayerMath.progressOpacity(0f))
         assertEquals(1f, PlayerMath.progressOpacity(5f))
         assertEquals(.72f, PlayerMath.progressOpacity(Float.NaN))
