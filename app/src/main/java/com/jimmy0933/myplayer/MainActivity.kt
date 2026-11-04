@@ -71,8 +71,10 @@ private fun MyPlayerApp() {
     var permissionAsked by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("本機離線播放 · 影片與照片不會上傳") }
     var typeFilter by remember { mutableStateOf("全部") }
-    var browserMode by remember { mutableStateOf(prefs.getString("browser", "全部") ?: "全部") }
-    var folder by remember { mutableStateOf(prefs.getString("folder", "") ?: "") }
+    // Always start at the indexed-media storage root, not the last opened
+    // subfolder. Users can still change to All/Videos/Photos/Favorites tabs.
+    var browserMode by remember { mutableStateOf("資料夾") }
+    var folder by remember { mutableStateOf("") }
     var search by remember { mutableStateOf(prefs.getString("search", "") ?: "") }
     var sort by remember { mutableStateOf(prefs.getString("sort", "最新") ?: "最新") }
     var listMode by remember { mutableStateOf(prefs.getBoolean("list", false)) }
@@ -133,7 +135,8 @@ private fun MyPlayerApp() {
                 "照片" -> !item.isVideo
                 else -> true
             }
-            val isFolder = folder.isBlank() || item.relativePath.trimEnd('/') == folder
+            val isFolder = browserMode != "資料夾" ||
+                FolderNavigation.isDirect(item.relativePath, folder)
             val isFavorite = browserMode != "收藏" || item.key in favorites
             val isSearch = search.isBlank() ||
                 item.name.contains(search, ignoreCase = true) ||
@@ -203,6 +206,10 @@ private fun MyPlayerApp() {
 
     val inViewer = viewerItems?.getOrNull(viewerIndex)
     BackHandler(inViewer != null) { viewerItems = null }
+    BackHandler(inViewer == null && browserMode == "資料夾" && folder.isNotBlank()) {
+        folder = FolderNavigation.parent(folder)
+        selected = emptySet()
+    }
     if (inViewer != null) {
         val viewing = viewerItems.orEmpty()
         ViewerScreen(
@@ -226,11 +233,14 @@ private fun MyPlayerApp() {
             onRefresh = { refresh() },
             onMode = {
                 browserMode = it
-                if (it != "資料夾") folder = ""
-                prefs.edit().putString("browser", it).apply()
+                // Entering folder browsing always starts from its root.
+                folder = ""
             },
             onType = { typeFilter = it },
-            onFolder = { folder = it; prefs.edit().putString("folder", it).apply() },
+            onFolder = {
+                folder = FolderNavigation.normalize(it)
+                selected = emptySet()
+            },
             onFavoriteFolder = { key ->
                 persistFavoriteFolders(if (key in favoriteFolders) favoriteFolders - key
                     else favoriteFolders + key)

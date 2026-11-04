@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -25,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
@@ -83,9 +85,13 @@ fun GalleryScreen(
     val snackbar = remember { SnackbarHostState() }
     val selectionMode = GallerySelection.active(selected)
     val allFavorited = selectionMode && selected.all { it in favorites }
-    val folders = remember(allMedia) {
-        allMedia.groupBy { it.relativePath.trimEnd('/').ifBlank { "其他" } }
-    }
+    // MediaStore directories only: root -> immediate child -> next level.
+    val childFolders = remember(allMedia, folder) {
+        FolderNavigation.children(allMedia.map { it.relativePath }, folder)
+    }.sortedWith(
+        compareByDescending<FolderNavigation.Child> { it.path in favoriteFolders }
+            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+    )
     val activeTab = when (browserMode) {
         "資料夾" -> "資料夾"
         "收藏" -> "收藏"
@@ -248,18 +254,46 @@ fun GalleryScreen(
             }
         }
 
-        if (folder.isNotBlank()) {
+        if (browserMode == "資料夾") {
+            // Always display which level is open. Back goes one directory, not
+            // all the way to root, and root is the initial folder view.
             Row(
-                Modifier.fillMaxWidth().height(34.dp)
-                    .padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth().height(39.dp)
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { onFolder(""); onClearSelection() }) {
-                    Text("‹ 資料夾", style = MaterialTheme.typography.labelMedium)
+                if (folder.isNotBlank()) {
+                    IconButton(
+                        onClick = {
+                            onFolder(FolderNavigation.parent(folder))
+                            onClearSelection()
+                        },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.ArrowBack, "上一層資料夾", tint = UiColors.Mint,
+                            modifier = Modifier.size(21.dp))
+                    }
+                } else {
+                    Icon(Icons.Default.Storage, null, tint = UiColors.Mint,
+                        modifier = Modifier.padding(start = 10.dp).size(21.dp))
+                    Spacer(Modifier.width(7.dp))
                 }
-                Text(folder.substringAfterLast('/'), color = UiColors.Subtle,
-                    style = MaterialTheme.typography.labelMedium,
-                    overflow = TextOverflow.Ellipsis, maxLines = 1)
+                Text(
+                    if (folder.isBlank()) "內部儲存空間 · 根目錄"
+                    else "內部儲存空間 / $folder",
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (folder.isNotBlank()) {
+                    TextButton(onClick = {
+                        onFolder("")
+                        onClearSelection()
+                    }) { Text("根目錄", color = UiColors.Mint) }
+                }
             }
         }
 
@@ -279,48 +313,96 @@ fun GalleryScreen(
                             Button(onClick = onRequestPermission) { Text("授權讀取") }
                         }
                     }
-                browserMode == "資料夾" && folder.isBlank() -> {
-                    val rows = folders.entries.sortedWith(
-                        compareByDescending<Map.Entry<String, List<LocalMedia>>> {
-                            it.key in favoriteFolders
-                        }.thenBy { it.key }
-                    )
-                    if (rows.isEmpty()) {
-                        EmptyGallery(Modifier.fillMaxSize(), "沒有找到資料夾")
+                browserMode == "資料夾" -> {
+                    if (childFolders.isEmpty() && visibleMedia.isEmpty()) {
+                        EmptyGallery(Modifier.fillMaxSize(), "此資料夾沒有可讀取的照片或影片")
                     } else {
-                        LazyColumn(
-                            Modifier.fillMaxSize(),
+                        // A single scrollable surface for child directories and
+                        // direct media in the current folder. Folder rows always
+                        // span the full grid width, including three-column mode.
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(if (listMode) 1 else 3),
+                            state = gridState,
+                            modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
-                                start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                start = 9.dp, end = 9.dp, top = 4.dp, bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            items(rows, key = { it.key }) { entry ->
+                            items(
+                                childFolders,
+                                key = { "folder:${it.path}" },
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) { entry ->
                                 Row(
                                     Modifier.fillMaxWidth()
-                                        .clip(RoundedCornerShape(13.dp))
+                                        .clip(RoundedCornerShape(12.dp))
                                         .background(UiColors.Panel)
-                                        .clickable { onFolder(entry.key) }
-                                        .padding(start = 13.dp, end = 5.dp, top = 9.dp, bottom = 9.dp),
+                                        .clickable {
+                                            onFolder(entry.path)
+                                            onClearSelection()
+                                        }
+                                        .padding(
+                                            start = 12.dp, end = 5.dp,
+                                            top = 7.dp, bottom = 7.dp
+                                        ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Folder, null, tint = UiColors.Mint,
-                                        modifier = Modifier.size(28.dp))
+                                    Icon(
+                                        Icons.Default.Folder, null,
+                                        tint = UiColors.Mint,
+                                        modifier = Modifier.size(27.dp)
+                                    )
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text(entry.key.substringAfterLast('/'),
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${entry.value.size} 個",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = UiColors.Subtle)
+                                        Text(
+                                            entry.name,
+                                            // Explicit contrast on dark custom background:
+                                            // MaterialTheme default onSurface can be black.
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 17.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            "${entry.mediaCount} 個檔案（含子資料夾）",
+                                            color = UiColors.Subtle,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
-                                    IconButton(onClick = { onFavoriteFolder(entry.key) }) {
+                                    IconButton(onClick = { onFavoriteFolder(entry.path) }) {
                                         Icon(
-                                            if (entry.key in favoriteFolders) Icons.Default.Star
+                                            if (entry.path in favoriteFolders) Icons.Default.Star
                                             else Icons.Default.StarBorder,
-                                            "收藏資料夾", tint = if (entry.key in favoriteFolders)
-                                                UiColors.Mint else UiColors.Subtle)
+                                            "收藏資料夾",
+                                            tint = if (entry.path in favoriteFolders) UiColors.Mint
+                                                else UiColors.Subtle
+                                        )
                                     }
+                                    Icon(
+                                        Icons.Default.ChevronRight,
+                                        "進入子資料夾",
+                                        tint = UiColors.Subtle,
+                                        modifier = Modifier.size(19.dp)
+                                    )
                                 }
+                            }
+                            items(visibleMedia, key = { it.key }) { entry ->
+                                MediaTile(
+                                    entry = entry, listMode = listMode,
+                                    imageLoader = galleryLoader,
+                                    selectionMode = selectionMode,
+                                    checked = entry.key in selected,
+                                    favorite = entry.key in favorites,
+                                    onClick = {
+                                        if (selectionMode) onSelect(entry) else onOpen(entry)
+                                    },
+                                    onLongPress = { onSelect(entry) },
+                                    onSelect = { onSelect(entry) }
+                                )
                             }
                         }
                     }
