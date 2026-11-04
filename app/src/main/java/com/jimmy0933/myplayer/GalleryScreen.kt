@@ -81,7 +81,7 @@ fun GalleryScreen(
         ImageLoader.Builder(context).components { add(VideoFrameDecoder.Factory()) }.build()
     }
     val snackbar = remember { SnackbarHostState() }
-    val selectionMode = selected.isNotEmpty()
+    val selectionMode = GallerySelection.active(selected)
     val allFavorited = selectionMode && selected.all { it in favorites }
     val folders = remember(allMedia) {
         allMedia.groupBy { it.relativePath.trimEnd('/').ifBlank { "其他" } }
