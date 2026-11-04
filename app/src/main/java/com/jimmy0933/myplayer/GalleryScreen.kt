@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,7 @@ object UiColors {
     val Subtle = Color(0xFFAFBDD3)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GalleryScreen(
     allMedia: List<LocalMedia>,
@@ -297,9 +299,16 @@ fun GalleryScreen(
             }
         }
 
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        // Native pull-to-refresh works on both grid and list layouts, and only
+        // begins when the current list has been scrolled to its top.
+        PullToRefreshBox(
+            isRefreshing = loading && allMedia.isNotEmpty(),
+            onRefresh = { if (!loading) onRefresh() },
+            modifier = Modifier.weight(1f).fillMaxWidth()
+        ) {
+            Box(Modifier.fillMaxSize()) {
             when {
-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                loading && allMedia.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = UiColors.Mint)
                 }
                 !hasPermission && galleryIsEmpty(allMedia) ->
@@ -315,7 +324,7 @@ fun GalleryScreen(
                     }
                 browserMode == "資料夾" -> {
                     if (childFolders.isEmpty() && visibleMedia.isEmpty()) {
-                        EmptyGallery(Modifier.fillMaxSize(), "此資料夾沒有可讀取的照片或影片")
+                        EmptyGallery(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), "此資料夾沒有可讀取的照片或影片")
                     } else {
                         // A single scrollable surface for child directories and
                         // direct media in the current folder. Folder rows always
@@ -408,7 +417,7 @@ fun GalleryScreen(
                     }
                 }
                 visibleMedia.isEmpty() ->
-                    EmptyGallery(Modifier.fillMaxSize(), "目前沒有符合條件的照片或影片")
+                    EmptyGallery(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), "目前沒有符合條件的照片或影片")
                 else -> {
                     Box(Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
@@ -444,6 +453,7 @@ fun GalleryScreen(
                         }
                     }
                 }
+            }
             }
         }
         // Allocate room for feedback instead of covering the grid or system navigation.

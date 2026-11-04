@@ -44,6 +44,7 @@ jobs:
           VIEWER=app/src/main/java/com/jimmy0933/myplayer/ViewerScreen.kt
           grep -Fq 'if (selectionMode)' "$GALLERY"
           grep -Fq 'onLongPress = { onSelect(entry) }' "$GALLERY"
+          grep -Fq 'PullToRefreshBox(' "$GALLERY"
           grep -Fq 'onFileAction("移動")' "$GALLERY"
           grep -Fq 'onFileAction("刪除")' "$GALLERY"
           grep -Fq 'onFavoriteSelection()' "$GALLERY"
@@ -62,7 +63,7 @@ jobs:
           grep -Fq 'if (entry.isVideo)' "$GALLERY"
           echo "Video file sizes visible in thumbnail and list modes"
           echo "Folder hierarchy and title contrast checks PASS"
-          echo "Compact gallery and timeline-only viewer rules PASS"
+          echo "Gallery pull-to-refresh, compact layout and timeline-only viewer rules PASS"
 
       - name: Prepare signing key from GitHub Actions Secrets
         id: signing
@@ -104,10 +105,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.4-signed.apk
+            NAME=MyPlayer-v1.1.5-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.4-debug-signed.apk
+            NAME=MyPlayer-v1.1.5-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -123,9 +124,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.4"
+          TAG="v1.1.5"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.4 · rebuilt native Android app
+          # My Player v1.1.5 · pull-to-refresh gallery
+
+          Pull down at the top of the photo/video list or folder grid to rescan
+          the device media library. The native refresh indicator appears above
+          existing content without interfering with the viewer's vertical swipe.
 
           Thumbnail video badges now show only a translucent duration at bottom right;
           file size stays in list view. A brief arrow confirms vertical swipe navigation.
@@ -145,9 +150,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.4 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.5 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.4 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.5 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
