@@ -205,16 +205,10 @@ private fun MyPlayerApp() {
     BackHandler(inViewer != null) { viewerItems = null }
     if (inViewer != null) {
         val viewing = viewerItems.orEmpty()
-        val videoFlags = viewing.map { it.isVideo }
-        val prev = PlayerMath.videoNeighbor(videoFlags, viewerIndex, -1)
-        val next = PlayerMath.videoNeighbor(videoFlags, viewerIndex, 1)
         ViewerScreen(
-            media = inViewer, position = viewerIndex, total = viewing.size,
-            hasPreviousVideo = prev != null, hasNextVideo = next != null,
+            media = inViewer,
             onBack = { viewerItems = null },
             onChange = { step -> viewerIndex = (viewerIndex + step).coerceIn(0, viewing.lastIndex) },
-            onPreviousVideo = { if (prev != null) viewerIndex = prev },
-            onNextVideo = { if (next != null) viewerIndex = next },
             onDelete = { requestDelete(listOf(inViewer)) },
             onRepairMp4 = { showRepairPrompt = inViewer },
             onPlaybackSettings = { showSettings = true },
