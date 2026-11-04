@@ -357,8 +357,8 @@ fun ViewerScreen(
                         ) else Modifier
                     )
                     .navigationBarsPadding()
+                    .padding(horizontal = if (isLandscape) 8.dp else 10.dp)
                     .padding(
-                        horizontal = if (isLandscape) 8.dp else 10.dp,
                         top = 2.dp,
                         bottom = if (isLandscape) 20.dp else 36.dp
                     ),
