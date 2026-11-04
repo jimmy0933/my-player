@@ -9,13 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.PauseCircleFilled
-import androidx.compose.material.icons.filled.PlayCircleFilled
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.ZoomOutMap
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,14 +51,8 @@ private val Muted = Color(0xFFC8D3E7)
 @Composable
 fun ViewerScreen(
     media: LocalMedia,
-    position: Int,
-    total: Int,
-    hasPreviousVideo: Boolean,
-    hasNextVideo: Boolean,
     onBack: () -> Unit,
     onChange: (Int) -> Unit,
-    onPreviousVideo: () -> Unit,
-    onNextVideo: () -> Unit,
     onDelete: () -> Unit,
     onRepairMp4: () -> Unit,
     onPlaybackSettings: () -> Unit,
@@ -102,6 +90,7 @@ fun ViewerScreen(
     var playing by remember(media.key) { mutableStateOf(media.isVideo) }
     var controlsVisible by remember(media.key) { mutableStateOf(true) }
     var seekHint by remember(media.key) { mutableStateOf<String?>(null) }
+    var previewMenuOpen by remember(media.key) { mutableStateOf(false) }
     var interaction by remember(media.key) { mutableIntStateOf(0) }
     var lastTapTime by remember(media.key) { mutableLongStateOf(-1L) }
     var lastTapPoint by remember(media.key) { mutableStateOf(Offset.Zero) }
@@ -129,8 +118,10 @@ fun ViewerScreen(
             delay(250)
         }
     }
-    LaunchedEffect(media.key, playing, interaction) {
-        if (media.isVideo && playing) {
+    LaunchedEffect(media.key, playing, interaction, previewMenuOpen) {
+        if (previewMenuOpen) {
+            controlsVisible = true
+        } else if (media.isVideo && playing) {
             delay(2_000)
             controlsVisible = false
         } else controlsVisible = true
@@ -269,99 +260,92 @@ fun ViewerScreen(
                     .padding(horizontal = 18.dp, vertical = 10.dp))
         }
         if (controlsVisible) {
+            // The viewer remains edge-to-edge. Only a thin transparent top overlay
+            // and (for video) a single playback timeline sit above the media.
             Row(
                 Modifier.fillMaxWidth().align(Alignment.TopCenter)
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .82f), Color.Transparent)))
-                    .padding(horizontal = 8.dp, vertical = if (isLandscape) 2.dp else 10.dp),
+                    .background(Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = .74f), Color.Transparent)))
+                    .statusBarsPadding()
+                    .padding(start = 2.dp, end = 2.dp, top = 2.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { showControls(); onBack() }) {
+                IconButton(onClick = { previewMenuOpen = false; onBack() }) {
                     Icon(Icons.Default.ArrowBack, "返回相簿", tint = Color.White)
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(media.name, color = Color.White, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                    if (!isLandscape)
-                        Text("${position + 1} / $total · ${if (media.isVideo) "影片" else "照片"}",
-                            color = Muted, style = MaterialTheme.typography.labelSmall)
-                }
-                if (zoom > 1.01f) {
-                    IconButton(onClick = { zoom = 1f; translation = Offset.Zero; showControls() }) {
-                        Icon(Icons.Default.ZoomOutMap, "重設縮放", tint = Color.White)
+                Text(
+                    media.name,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Box {
+                    IconButton(onClick = { showControls(); previewMenuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, "圖片與影片操作", tint = Color.White)
                     }
-                }
-                IconButton(onClick = { showControls(); onPlaybackSettings() }) {
-                    Icon(Icons.Default.Settings, "播放設定", tint = Color.White)
-                }
-                if (media.isVideo) {
-                    TextButton(onClick = { showControls(); player?.pause(); onRepairMp4() }) {
-                        Text("修復快轉", color = Accent, style = MaterialTheme.typography.labelSmall)
+                    DropdownMenu(
+                        expanded = previewMenuOpen,
+                        onDismissRequest = { previewMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("進度條與播放器設定") },
+                            onClick = {
+                                previewMenuOpen = false
+                                showControls()
+                                onPlaybackSettings()
+                            }
+                        )
+                        if (media.isVideo) {
+                            DropdownMenuItem(
+                                text = { Text("建立可快轉的 MP4 副本") },
+                                onClick = {
+                                    previewMenuOpen = false
+                                    player?.pause()
+                                    onRepairMp4()
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("刪除目前檔案", color = Color(0xFFFFA4A9)) },
+                            onClick = {
+                                previewMenuOpen = false
+                                player?.pause()
+                                onDelete()
+                            }
+                        )
                     }
-                }
-                IconButton(onClick = { player?.pause(); onDelete() }) {
-                    Icon(Icons.Default.DeleteOutline, "刪除目前媒體", tint = Color(0xFFFF9DA6))
                 }
             }
-            Column(
-                Modifier.fillMaxWidth().align(Alignment.BottomCenter)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .95f))))
-                    .padding(horizontal = if (isLandscape) 12.dp else 18.dp,
-                        vertical = if (isLandscape) 4.dp else 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (media.isVideo) {
-                    if (isLandscape) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            PlayerTransportButton(hasPreviousVideo, true) { showControls(); onPreviousVideo() }
-                            PlayerPlayButton(playing) { togglePlayback() }
-                            PlayerTransportButton(hasNextVideo, false) { showControls(); onNextVideo() }
-                            Text(PlayerMath.durationLabel(currentMs), color = Color.White,
-                                style = MaterialTheme.typography.labelSmall)
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                Timeline(fraction, seekToFraction, progressScale, progressWidth)
-                            }
-                            Text(PlayerMath.durationLabel(duration), color = Color.White,
-                                style = MaterialTheme.typography.labelSmall)
-                        }
-                    } else {
+            if (media.isVideo) {
+                Row(
+                    Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+                        .background(Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = .78f))))
+                        .navigationBarsPadding()
+                        .padding(horizontal = if (isLandscape) 12.dp else 14.dp,
+                            vertical = if (isLandscape) 4.dp else 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        PlayerMath.durationLabel(currentMs),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Timeline(fraction, seekToFraction, progressScale, progressWidth)
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(PlayerMath.durationLabel(currentMs), color = Color.White)
-                            Text(PlayerMath.durationLabel(duration), color = Color.White)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            PlayerTransportButton(hasPreviousVideo, true) { showControls(); onPreviousVideo() }
-                            Spacer(Modifier.width(22.dp))
-                            PlayerPlayButton(playing) { togglePlayback() }
-                            Spacer(Modifier.width(22.dp))
-                            PlayerTransportButton(hasNextVideo, false) { showControls(); onNextVideo() }
-                        }
-                        Text("左右滑動快轉／倒退 · 上下滑動切換 · 雙指縮放",
-                            color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
-                } else if (!isLandscape) {
-                    Text("上下滑動切換照片／影片 · 雙指縮放",
-                        color = Muted, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        PlayerMath.durationLabel(duration),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PlayerTransportButton(enabled: Boolean, previous: Boolean, action: () -> Unit) {
-    IconButton(onClick = action, enabled = enabled, modifier = Modifier.size(42.dp)) {
-        Icon(if (previous) Icons.Default.SkipPrevious else Icons.Default.SkipNext,
-            if (previous) "上一部影片" else "下一部影片",
-            tint = if (enabled) Color.White else Color.Gray)
-    }
-}
-
-@Composable
-private fun PlayerPlayButton(playing: Boolean, action: () -> Unit) {
-    IconButton(onClick = action, modifier = Modifier.size(50.dp)) {
-        Icon(if (playing) Icons.Default.PauseCircleFilled else Icons.Default.PlayCircleFilled,
-            if (playing) "暫停" else "播放", modifier = Modifier.size(44.dp), tint = Color.White)
     }
 }
 

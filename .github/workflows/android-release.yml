@@ -2,13 +2,15 @@ name: Android APK · latest release
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: my-player-latest-release
+  group: my-player-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +36,26 @@ jobs:
           gradle-version: '8.13'
       - name: Compile and run player regression tests
         run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+
+      - name: Check compact gallery and viewer layout rules
+        run: |
+          set -euo pipefail
+          GALLERY=app/src/main/java/com/jimmy0933/myplayer/GalleryScreen.kt
+          VIEWER=app/src/main/java/com/jimmy0933/myplayer/ViewerScreen.kt
+          grep -Fq 'if (selectionMode)' "$GALLERY"
+          grep -Fq 'onLongPress = { onSelect(entry) }' "$GALLERY"
+          grep -Fq 'onFileAction("移動")' "$GALLERY"
+          grep -Fq 'onFileAction("刪除")' "$GALLERY"
+          grep -Fq 'onFavoriteSelection()' "$GALLERY"
+          if grep -Eq 'PlayerTransportButton|PlayerPlayButton' "$VIEWER"; then
+            echo "ERROR: Bottom transport buttons must not block the video"
+            exit 1
+          fi
+          if grep -Fq 'if (selected.isNotEmpty()) {' "$GALLERY"; then
+            echo "ERROR: Old sticky selection footer was reintroduced"
+            exit 1
+          fi
+          echo "Compact gallery and timeline-only viewer rules PASS"
 
       - name: Prepare signing key from GitHub Actions Secrets
         id: signing
@@ -75,10 +97,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.0-signed.apk
+            NAME=MyPlayer-v1.1.1-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.0-debug-signed.apk
+            NAME=MyPlayer-v1.1.1-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -87,17 +109,18 @@ jobs:
           echo "apk=dist/$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Publish newest release, remove all previous releases
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           SIGN_MODE: ${{ steps.signing.outputs.mode }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.0"
+          TAG="v1.1.1"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.0 · rebuilt native Android app
+          # My Player v1.1.1 · rebuilt native Android app
 
-          Restored: gallery, video/photo browsing, search, folders, favorites, configurable playback timeline,
+          Content-first redesign: compact gallery tabs, full-size media tiles, long-press selection only,\n          top-right copy/move/delete/favorites, full-screen photo and video, minimal timeline.\n          Restored: gallery, video/photo browsing, search, folders, favorites, configurable playback timeline,
           Media3 1.11.1, pinch zoom, video swipe seek, portrait/landscape controls, selection,
           copy/move via in-app folder picker, Android-authorized deletion, MP4 seek-repair copy.
 
@@ -108,9 +131,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.0 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.1 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.0 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.1 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then

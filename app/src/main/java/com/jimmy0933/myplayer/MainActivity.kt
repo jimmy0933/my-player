@@ -205,16 +205,10 @@ private fun MyPlayerApp() {
     BackHandler(inViewer != null) { viewerItems = null }
     if (inViewer != null) {
         val viewing = viewerItems.orEmpty()
-        val videoFlags = viewing.map { it.isVideo }
-        val prev = PlayerMath.videoNeighbor(videoFlags, viewerIndex, -1)
-        val next = PlayerMath.videoNeighbor(videoFlags, viewerIndex, 1)
         ViewerScreen(
-            media = inViewer, position = viewerIndex, total = viewing.size,
-            hasPreviousVideo = prev != null, hasNextVideo = next != null,
+            media = inViewer,
             onBack = { viewerItems = null },
             onChange = { step -> viewerIndex = (viewerIndex + step).coerceIn(0, viewing.lastIndex) },
-            onPreviousVideo = { if (prev != null) viewerIndex = prev },
-            onNextVideo = { if (next != null) viewerIndex = next },
             onDelete = { requestDelete(listOf(inViewer)) },
             onRepairMp4 = { showRepairPrompt = inViewer },
             onPlaybackSettings = { showSettings = true },
@@ -249,11 +243,14 @@ private fun MyPlayerApp() {
                 viewerIndex = visible.indexOfFirst { it.key == entry.key }.coerceAtLeast(0)
             },
             onSelect = { entry ->
-                selected = if (entry.key in selected) selected - entry.key else selected + entry.key
+                selected = GallerySelection.toggle(selected, entry.key)
             },
-            onToggleFavorite = { entry ->
-                persistFavorites(if (entry.key in favorites) favorites - entry.key
-                    else favorites + entry.key)
+            onFavoriteSelection = {
+                if (selected.isNotEmpty()) {
+                    val allSelectedFavorited = selected.all { it in favorites }
+                    persistFavorites(if (allSelectedFavorited) favorites - selected
+                        else favorites + selected)
+                }
             },
             onClearSelection = { selected = emptySet() },
             onFileAction = { kind ->
