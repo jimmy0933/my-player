@@ -251,9 +251,12 @@ private fun MyPlayerApp() {
             onSelect = { entry ->
                 selected = if (entry.key in selected) selected - entry.key else selected + entry.key
             },
-            onToggleFavorite = { entry ->
-                persistFavorites(if (entry.key in favorites) favorites - entry.key
-                    else favorites + entry.key)
+            onFavoriteSelection = {
+                if (selected.isNotEmpty()) {
+                    val allSelectedFavorited = selected.all { it in favorites }
+                    persistFavorites(if (allSelectedFavorited) favorites - selected
+                        else favorites + selected)
+                }
             },
             onClearSelection = { selected = emptySet() },
             onFileAction = { kind ->
