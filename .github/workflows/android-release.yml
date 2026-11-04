@@ -45,6 +45,8 @@ jobs:
           grep -Fq 'if (selectionMode)' "$GALLERY"
           grep -Fq 'onLongPress = { onSelect(entry) }' "$GALLERY"
           grep -Fq 'PullToRefreshBox(' "$GALLERY"
+          grep -Fq 'progressThicknessDp(size)' "$VIEWER"
+          grep -Fq 'if (media.isVideo) {' "$VIEWER"
           grep -Fq 'onFileAction("移動")' "$GALLERY"
           grep -Fq 'onFileAction("刪除")' "$GALLERY"
           grep -Fq 'onFavoriteSelection()' "$GALLERY"
@@ -105,10 +107,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.5-signed.apk
+            NAME=MyPlayer-v1.1.6-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.5-debug-signed.apk
+            NAME=MyPlayer-v1.1.6-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -124,9 +126,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.5"
+          TAG="v1.1.6"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.5 · pull-to-refresh gallery
+          # My Player v1.1.6 · visible and adjustable playback timeline
+
+          Fixed playback timeline configuration: the progress line now stays visible
+          while playback controls fade, track thickness spans 2-14dp, and opacity
+          and width update the rendered line. Settings includes live preview and
+          intuitive transparency direction. Values persist after restart.
 
           Pull down at the top of the photo/video list or folder grid to rescan
           the device media library. The native refresh indicator appears above
@@ -150,9 +157,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.5 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.6 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.5 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.6 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then

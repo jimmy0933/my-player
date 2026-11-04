@@ -28,6 +28,10 @@ class PlayerMathTest {
         assertEquals(.15f, PlayerMath.progressOpacity(0f))
         assertEquals(1f, PlayerMath.progressOpacity(5f))
         assertEquals(.72f, PlayerMath.progressOpacity(Float.NaN))
+        assertEquals(2f, PlayerMath.progressThicknessDp(.8f), .001f)
+        assertEquals(14f, PlayerMath.progressThicknessDp(2.5f), .001f)
+        assertTrue(PlayerMath.progressThicknessDp(2f) >
+            PlayerMath.progressThicknessDp(1f))
     }
     @Test fun mediaStoreFolderSafety() {
         assertEquals("Movies/MyPlayer/", MediaOperations.cleanFolder("", true))

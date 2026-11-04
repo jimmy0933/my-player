@@ -343,25 +343,40 @@ fun ViewerScreen(
                     }
                 }
             }
-            if (media.isVideo) {
-                Row(
-                    Modifier.fillMaxWidth().align(Alignment.BottomCenter)
-                        .background(Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = .78f))))
-                        .navigationBarsPadding()
-                        .padding(horizontal = if (isLandscape) 12.dp else 14.dp,
-                            vertical = if (isLandscape) 4.dp else 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+        }
+        // Keep the timeline visible while the movie is playing. Previously it
+        // disappeared with the control overlay after two seconds, making changes
+        // in playback settings appear to have no effect.
+        if (media.isVideo) {
+            Row(
+                Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+                    .then(
+                        if (controlsVisible) Modifier.background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = .70f))
+                            )
+                        ) else Modifier
+                    )
+                    .navigationBarsPadding()
+                    .padding(horizontal = if (isLandscape) 12.dp else 14.dp,
+                        vertical = if (isLandscape) 2.dp else 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (controlsVisible) {
                     Text(
                         PlayerMath.durationLabel(currentMs),
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall
                     )
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        Timeline(fraction, seekToFraction, progressScale, progressWidth, progressOpacity)
-                    }
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Timeline(
+                        fraction, seekToFraction, progressScale, progressWidth,
+                        progressOpacity, controlsVisible
+                    )
+                }
+                if (controlsVisible) {
                     Text(
                         PlayerMath.durationLabel(duration),
                         color = Color.White,
@@ -370,33 +385,52 @@ fun ViewerScreen(
                 }
             }
         }
+
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Timeline(
-    value: Float, onChange: (Float) -> Unit, size: Float, width: Float, opacity: Float
+internal fun Timeline(
+    value: Float,
+    onChange: (Float) -> Unit,
+    size: Float,
+    width: Float,
+    opacity: Float,
+    controlsVisible: Boolean = true
 ) {
-    val clampedSize = PlayerMath.progressScale(size)
+    val thickness = PlayerMath.progressThicknessDp(size)
     val alpha = PlayerMath.progressOpacity(opacity)
-    val trackColor = Accent.copy(alpha = alpha)
-    Slider(value = value.coerceIn(0f, 1f), onValueChange = onChange,
+    val played = Accent.copy(alpha = alpha)
+    val unplayed = Color.White.copy(alpha = .28f * alpha)
+    Slider(
+        value = value.coerceIn(0f, 1f),
+        onValueChange = onChange,
         modifier = Modifier.fillMaxWidth(PlayerMath.progressWidth(width))
-            .height((30 * clampedSize).dp),
+            .height(36.dp),
         colors = SliderDefaults.colors(
-            thumbColor = trackColor,
-            activeTrackColor = trackColor,
-            inactiveTrackColor = Color.White.copy(alpha = .2f * alpha)
+            thumbColor = played,
+            activeTrackColor = played,
+            inactiveTrackColor = unplayed
         ),
         thumb = {
-            Box(Modifier.size((10 * clampedSize).dp).background(trackColor, CircleShape))
+            if (controlsVisible) {
+                Box(
+                    Modifier.size((thickness + 8f).dp)
+                        .background(played, CircleShape)
+                )
+            }
         },
         track = { state ->
-            Box(Modifier.fillMaxWidth().height((3 * clampedSize).dp)
-                .background(Color.White.copy(alpha = .25f * alpha), CircleShape)) {
-                Box(Modifier.fillMaxWidth(state.value.coerceIn(0f, 1f)).fillMaxHeight()
-                    .background(trackColor, CircleShape))
+            Box(
+                Modifier.fillMaxWidth().height(thickness.dp)
+                    .background(unplayed, CircleShape)
+            ) {
+                Box(
+                    Modifier.fillMaxWidth(state.value.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(played, CircleShape)
+                )
             }
         }
     )

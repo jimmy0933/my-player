@@ -453,19 +453,40 @@ private fun PlaybackSettingsDialog(
 ) {
     var scale by remember(size) { mutableFloatStateOf(size) }
     var barWidth by remember(width) { mutableFloatStateOf(width) }
-    var barOpacity by remember(opacity) { mutableFloatStateOf(opacity) }
+    // The control now moves in the intuitive direction: further right means
+    // more transparent. Persisted values remain opacity for compatibility.
+    var transparency by remember(opacity) { mutableFloatStateOf(1f - opacity) }
+    var previewProgress by remember { mutableFloatStateOf(.4f) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("播放器設定") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("進度條粗細：${(scale * 100).toInt()}%")
+                Text("進度條粗細：${PlayerMath.progressThicknessDp(scale).toInt()} dp")
                 Slider(value = scale, onValueChange = { scale = it }, valueRange = .8f..2.5f)
                 Text("進度條寬度：${(barWidth * 100).toInt()}%")
                 Slider(value = barWidth, onValueChange = { barWidth = it }, valueRange = .6f..1f)
-                Text("進度條透明度：${((1f - barOpacity) * 100).toInt()}%（越高越透明）")
-                Slider(value = barOpacity, onValueChange = { barOpacity = it },
-                    valueRange = .15f..1f)
+                Text("進度條透明度：${(transparency * 100f).toInt()}%")
+                Slider(
+                    value = transparency,
+                    onValueChange = { transparency = it },
+                    valueRange = 0f.. .85f
+                )
+                Text(
+                    "實際進度線預覽（可拖動）",
+                    color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall
+                )
+                Box(
+                    Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
+                        .background(Color.Black, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .height(66.dp),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
+                ) {
+                    Timeline(
+                        previewProgress, { previewProgress = it },
+                        scale, barWidth, 1f - transparency
+                    )
+                }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Text(if (canManage) "媒體管理權限：已啟用"
                      else "媒體管理權限：未啟用（刪除時由 Android 再次確認）",
@@ -475,7 +496,7 @@ private fun PlaybackSettingsDialog(
                     color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(scale, barWidth, barOpacity) }) { Text("儲存") } },
+        confirmButton = { TextButton(onClick = { onSave(scale, barWidth, 1f - transparency) }) { Text("儲存") } },
         dismissButton = { TextButton(onClick = { onSave(1f, .96f, .72f) }) { Text("恢復預設") } }
     )
 }

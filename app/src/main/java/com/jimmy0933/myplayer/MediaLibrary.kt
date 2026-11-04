@@ -101,4 +101,8 @@ object PlayerMath {
     fun progressScale(value: Float): Float = if (value.isFinite()) value.coerceIn(.8f, 2.5f) else 1f
     fun progressWidth(value: Float): Float = if (value.isFinite()) value.coerceIn(.6f, 1f) else .96f
     fun progressOpacity(value: Float): Float = if (value.isFinite()) value.coerceIn(.15f, 1f) else .72f
+    // Explicitly control the *drawn track height*, not just the Slider touch target.
+    // Existing persisted progress_size values are kept compatible.
+    fun progressThicknessDp(value: Float): Float =
+        2f + (progressScale(value) - .8f) / (2.5f - .8f) * 12f
 }
