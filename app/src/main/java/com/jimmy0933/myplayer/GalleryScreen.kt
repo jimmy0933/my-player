@@ -75,6 +75,11 @@ fun GalleryScreen(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(search.isNotBlank()) }
+    val context = LocalContext.current
+    // One shared decoder/cache for the gallery instead of one ImageLoader per tile.
+    val galleryLoader = remember(context) {
+        ImageLoader.Builder(context).components { add(VideoFrameDecoder.Factory()) }.build()
+    }
     val snackbar = remember { SnackbarHostState() }
     val selectionMode = selected.isNotEmpty()
     val allFavorited = selectionMode && selected.all { it in favorites }
@@ -336,6 +341,7 @@ fun GalleryScreen(
                             items(visibleMedia, key = { it.key }) { entry ->
                                 MediaTile(
                                     entry = entry, listMode = listMode,
+                                    imageLoader = galleryLoader,
                                     selectionMode = selectionMode,
                                     checked = entry.key in selected,
                                     favorite = entry.key in favorites,
@@ -383,6 +389,7 @@ private fun EmptyGallery(modifier: Modifier, text: String) {
 private fun MediaTile(
     entry: LocalMedia,
     listMode: Boolean,
+    imageLoader: ImageLoader,
     selectionMode: Boolean,
     checked: Boolean,
     favorite: Boolean,
@@ -391,9 +398,6 @@ private fun MediaTile(
     onSelect: () -> Unit
 ) {
     val context = LocalContext.current
-    val loader = remember(context) {
-        ImageLoader.Builder(context).components { add(VideoFrameDecoder.Factory()) }.build()
-    }
     val picture: @Composable () -> Unit = {
         Box(
             Modifier.then(if (listMode) Modifier.size(96.dp) else Modifier.fillMaxSize())
@@ -402,7 +406,7 @@ private fun MediaTile(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(entry.uri).crossfade(false).build(),
-                imageLoader = loader,
+                imageLoader = imageLoader,
                 contentDescription = entry.name, modifier = Modifier.fillMaxSize(),
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
