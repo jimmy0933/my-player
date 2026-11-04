@@ -106,7 +106,20 @@ object MediaOperations {
             .map { it.replace(Regex("[^\\p{L}\\p{N} _().-]"), "_").take(80) }
             .joinToString("/")
         val fallback = if (isVideo) "Movies/MyPlayer" else "Pictures/MyPlayer"
-        return (if (safe.isBlank()) fallback else safe).trimEnd('/') + "/"
+        if (safe.isBlank()) return "$fallback/"
+        val parts = safe.split('/')
+        val root = parts.first()
+        // MediaStore enforces different root directories per media collection.
+        // In particular, Video.Media cannot move a video into Download/.
+        // Keep the user's requested folder name as a subfolder under an
+        // Android-approved media root and expose that resolved path in the UI.
+        val roots = if (isVideo) listOf("DCIM", "Movies", "Pictures")
+                    else listOf("DCIM", "Pictures")
+        val canonical = roots.firstOrNull { it.equals(root, ignoreCase = true) }
+        val target = if (canonical != null)
+            listOf(canonical).plus(parts.drop(1)).joinToString("/")
+        else (if (isVideo) "Movies" else "Pictures") + "/" + safe
+        return "$target/"
     }
 
     /** Android MediaExtractor/MediaMuxer remux: repairs some non-seekable MP4 indexes without transcoding. */

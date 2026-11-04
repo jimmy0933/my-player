@@ -624,7 +624,7 @@ private fun GridFastScroll(
 
 @Composable
 fun FolderDestinationDialog(
-    folders: List<String>, operation: String,
+    folders: List<String>, operation: String, entries: List<LocalMedia>,
     onDismiss: () -> Unit, onApply: (String) -> Unit
 ) {
     val defaults = listOf("DCIM/Camera", "Movies", "Movies/MyPlayer", "Pictures",
@@ -633,17 +633,38 @@ fun FolderDestinationDialog(
     var destination by remember(operation) {
         mutableStateOf(if (operation == "移動") "Movies/MyPlayer" else "Pictures/MyPlayer")
     }
+    val actualTargets = remember(destination, entries) {
+        entries.map { entry -> entry.isVideo to MediaOperations.cleanFolder(destination, entry.isVideo) }
+            .distinct()
+    }
+    val redirected = actualTargets.any { (_, actual) ->
+        actual.trimEnd('/') != destination.trim().trim('/').replace('\\', '/')
+    }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("選擇${operation}的目的資料夾") },
         text = {
             Column {
-                Text("可選現有資料夾，或直接輸入新資料夾路徑。",
+                Text("選擇資料夾後會顯示真正的目的地。Android 限制影片與照片只能放在支援的媒體目錄。",
                     color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(value = destination, onValueChange = { destination = it },
                     label = { Text("目的資料夾") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(6.dp))
+                if (actualTargets.isNotEmpty()) {
+                    Text("實際儲存位置：", color = if (redirected) Color(0xFFFFD18A) else UiColors.Mint,
+                        style = MaterialTheme.typography.labelMedium)
+                    actualTargets.forEach { (video, path) ->
+                        Text("${if (video) "影片" else "照片"}：$path",
+                            color = Color.White, style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (redirected) {
+                        Text("原路徑不支援此媒體類型，已改放合法媒體資料夾；確認後才執行。",
+                            color = Color(0xFFFFD18A), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 210.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(choices) { path ->
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
@@ -660,7 +681,7 @@ fun FolderDestinationDialog(
         },
         confirmButton = {
             TextButton(enabled = destination.isNotBlank(),
-                onClick = { onApply(destination) }) { Text("開始$operation") }
+                onClick = { onApply(destination) }) { Text("確認位置並$operation") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )

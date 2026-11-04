@@ -359,7 +359,8 @@ fun ViewerScreen(
                     .navigationBarsPadding()
                     .padding(
                         horizontal = if (isLandscape) 8.dp else 10.dp,
-                        vertical = if (isLandscape) 2.dp else 4.dp
+                        top = 2.dp,
+                        bottom = if (isLandscape) 20.dp else 36.dp
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -403,7 +404,7 @@ internal fun Timeline(
     Slider(
         value = value.coerceIn(0f, 1f),
         onValueChange = onChange,
-        modifier = Modifier.fillMaxWidth().height(36.dp),
+        modifier = Modifier.fillMaxWidth().height(52.dp),
         colors = SliderDefaults.colors(
             thumbColor = played,
             activeTrackColor = played,

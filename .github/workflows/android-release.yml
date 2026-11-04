@@ -42,10 +42,14 @@ jobs:
           set -euo pipefail
           GALLERY=app/src/main/java/com/jimmy0933/myplayer/GalleryScreen.kt
           VIEWER=app/src/main/java/com/jimmy0933/myplayer/ViewerScreen.kt
+          OPERATIONS=app/src/main/java/com/jimmy0933/myplayer/MediaOperations.kt
           grep -Fq 'if (selectionMode)' "$GALLERY"
           grep -Fq 'onLongPress = { onSelect(entry) }' "$GALLERY"
           grep -Fq 'PullToRefreshBox(' "$GALLERY"
           grep -Fq 'progressThicknessDp(size)' "$VIEWER"
+          grep -Fq 'bottom = if (isLandscape) 20.dp else 36.dp' "$VIEWER"
+          grep -Fq 'val actualTargets = remember(destination, entries)' "$GALLERY"
+          grep -Fq 'listOf("DCIM", "Movies", "Pictures")' "$OPERATIONS"
           grep -Fq 'Modifier.fillMaxWidth().height(36.dp)' "$VIEWER"
           if grep -Fq 'progressWidth' "$VIEWER"; then
             echo "ERROR: Timeline width must be fixed to maximum"
@@ -112,10 +116,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.7-signed.apk
+            NAME=MyPlayer-v1.1.8-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.7-debug-signed.apk
+            NAME=MyPlayer-v1.1.8-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -131,9 +135,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.7"
+          TAG="v1.1.8"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.7 · fixed full-width timeline
+          # My Player v1.1.8 · easier seeking and supported move destinations
+
+          Raised the full-width playback timeline 36dp above the system navigation
+          area (20dp in landscape), with a 52dp touch target. Its rendered track
+          remains independently adjustable in thickness and transparency.
+          Fixed move/copy failures when videos were sent to restricted Download/
+          or other incompatible roots: destinations are placed within allowed
+          media directories, and the exact resolved path is shown before approval.
+          Added regression coverage for video/photo destination rules.
 
           The timeline length is always the maximum available screen width,
           with time labels in a separate row. Width controls were removed.
@@ -166,9 +178,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.7 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.8 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.7 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.8 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then

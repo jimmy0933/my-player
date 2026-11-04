@@ -36,5 +36,12 @@ class PlayerMathTest {
         assertEquals("Pictures/MyPlayer/", MediaOperations.cleanFolder("", false))
         assertEquals("Movies/Kids/", MediaOperations.cleanFolder("Movies/Kids", true))
         assertEquals("Movies/Kids/", MediaOperations.cleanFolder("Movies/../Kids", true))
+        // Android MediaStore.Video.Media rejects Download/ as a primary directory.
+        assertEquals("Movies/Download/", MediaOperations.cleanFolder("Download", true))
+        assertEquals("Movies/Download/Clips/", MediaOperations.cleanFolder("Download/Clips", true))
+        assertEquals("Pictures/Download/", MediaOperations.cleanFolder("Download", false))
+        assertEquals("Pictures/Movies/Vacation/", MediaOperations.cleanFolder("Movies/Vacation", false))
+        assertEquals("DCIM/Camera/", MediaOperations.cleanFolder("dcim/Camera", true))
+        assertEquals("Pictures/", MediaOperations.cleanFolder("Pictures", false))
     }
 }

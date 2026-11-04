@@ -331,6 +331,7 @@ private fun MyPlayerApp() {
         FolderDestinationDialog(
             folders = MediaLibrary.folders(gallery),
             operation = operation,
+            entries = operationItems,
             onDismiss = { showFolderPicker = false },
             onApply = { target ->
                 showFolderPicker = false
