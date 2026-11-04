@@ -243,7 +243,7 @@ private fun MyPlayerApp() {
                 viewerIndex = visible.indexOfFirst { it.key == entry.key }.coerceAtLeast(0)
             },
             onSelect = { entry ->
-                selected = if (entry.key in selected) selected - entry.key else selected + entry.key
+                selected = GallerySelection.toggle(selected, entry.key)
             },
             onFavoriteSelection = {
                 if (selected.isNotEmpty()) {
