@@ -2,13 +2,15 @@ name: Android APK · latest release
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: my-player-latest-release
+  group: my-player-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -107,6 +109,7 @@ jobs:
           echo "apk=dist/$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Publish newest release, remove all previous releases
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           SIGN_MODE: ${{ steps.signing.outputs.mode }}
