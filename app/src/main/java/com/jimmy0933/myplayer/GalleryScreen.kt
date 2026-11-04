@@ -518,15 +518,51 @@ private fun MediaTile(
                 )
             }
             if (entry.isVideo) {
-                Text(
-                    PlayerMath.durationLabel(entry.durationMs),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.align(Alignment.BottomEnd)
-                        .padding(4.dp)
-                        .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                )
+                if (listMode) {
+                    // List mode shows the size alongside the folder name below.
+                    // Keep just the duration on the 96dp preview.
+                    Text(
+                        PlayerMath.durationLabel(entry.durationMs),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        modifier = Modifier.align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                } else {
+                    // Compact labels across the thumbnail bottom edge. Each
+                    // gets its own available width, so a long duration or
+                    // multi-GB size cannot overlap the adjacent label.
+                    Row(
+                        Modifier.align(Alignment.BottomCenter)
+                            .fillMaxWidth().padding(horizontal = 3.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            readableSize(entry.size),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                                .background(Color.Black.copy(alpha = .8f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 3.dp, vertical = 1.dp)
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            PlayerMath.durationLabel(entry.durationMs),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            modifier = Modifier.background(
+                                Color.Black.copy(alpha = .8f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 3.dp, vertical = 1.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -544,9 +580,13 @@ private fun MediaTile(
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(4.dp))
-                Text(entry.folder, color = UiColors.Subtle, maxLines = 1,
+                Text(
+                    if (entry.isVideo) "${entry.folder}  ·  ${readableSize(entry.size)}"
+                    else entry.folder,
+                    color = UiColors.Subtle, maxLines = 1,
                     style = MaterialTheme.typography.labelSmall,
-                    overflow = TextOverflow.Ellipsis)
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     } else {
