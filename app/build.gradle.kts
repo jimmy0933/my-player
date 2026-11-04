@@ -12,8 +12,8 @@ android {
         applicationId = "com.jimmy0933.myplayer"
         minSdk = 30
         targetSdk = 35
-        versionCode = 11002
-        versionName = "1.1.2"
+        versionCode = 11003
+        versionName = "1.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
