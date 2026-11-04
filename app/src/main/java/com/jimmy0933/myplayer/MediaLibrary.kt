@@ -100,4 +100,5 @@ object PlayerMath {
     }
     fun progressScale(value: Float): Float = if (value.isFinite()) value.coerceIn(.8f, 2.5f) else 1f
     fun progressWidth(value: Float): Float = if (value.isFinite()) value.coerceIn(.6f, 1f) else .96f
+    fun progressOpacity(value: Float): Float = if (value.isFinite()) value.coerceIn(.15f, 1f) else .72f
 }

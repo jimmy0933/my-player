@@ -90,10 +90,16 @@ private fun MyPlayerApp() {
     var deleteConfirmation by remember { mutableStateOf<List<LocalMedia>?>(null) }
     var deleteQueue by remember { mutableStateOf(emptyList<LocalMedia>()) }
     var activeDelete by remember { mutableStateOf(emptyList<LocalMedia>()) }
-    var movingDelete by remember { mutableStateOf(false) }
+    var moveQueue by remember { mutableStateOf(emptyList<LocalMedia>()) }
+    var activeMove by remember { mutableStateOf(emptyList<LocalMedia>()) }
+    var moveTarget by remember { mutableStateOf("") }
+    var movedCount by remember { mutableIntStateOf(0) }
+    var moveErrors by remember { mutableStateOf(emptyList<String>()) }
+    var operationErrors by remember { mutableStateOf(emptyList<String>()) }
     var showRepairPrompt by remember { mutableStateOf<LocalMedia?>(null) }
     var progressSize by remember { mutableFloatStateOf(PlayerMath.progressScale(prefs.getFloat("progress_size", 1f))) }
     var progressWidth by remember { mutableFloatStateOf(PlayerMath.progressWidth(prefs.getFloat("progress_width", .96f))) }
+    var progressOpacity by remember { mutableFloatStateOf(PlayerMath.progressOpacity(prefs.getFloat("progress_opacity", .72f))) }
 
     fun refresh() { refreshing++ }
     fun persistFavorites(value: Set<String>) {
@@ -152,9 +158,8 @@ private fun MyPlayerApp() {
         }
     }
 
-    fun requestDelete(items: List<LocalMedia>, isMove: Boolean = false) {
+    fun requestDelete(items: List<LocalMedia>) {
         if (items.isEmpty()) return
-        movingDelete = isMove
         deleteConfirmation = items.distinctBy { it.key }
     }
 
@@ -181,8 +186,7 @@ private fun MyPlayerApp() {
         } else {
             deleteQueue = emptyList()
             activeDelete = emptyList()
-            notice = if (movingDelete) "已複製到目的資料夾，但取消刪除原檔，來源檔仍保留"
-                else "已取消刪除，所有原始檔案保留"
+            notice = "已取消刪除，所有原始檔案保留"
         }
     }
     // Use MediaStore's native authorization, including when MANAGE_MEDIA was granted.
@@ -204,6 +208,51 @@ private fun MyPlayerApp() {
         }
     }
 
+    // Request temporary write access to the original URIs. Native relocation
+    // avoids allocating a second copy of a large video before deleting it.
+    val moveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { response ->
+        val batch = activeMove
+        if (response.resultCode == Activity.RESULT_OK) {
+            scope.launch {
+                val outcome = MediaOperations.move(context, batch, moveTarget)
+                movedCount += outcome.moved.size
+                moveErrors = moveErrors + outcome.failures
+                selected = selected - outcome.moved.map { it.key }.toSet()
+                gallery = MediaLibrary.load(context)
+                activeMove = emptyList()
+                if (moveQueue.isEmpty()) {
+                    notice = "移動完成：成功 $movedCount 個，失敗 ${moveErrors.size} 個"
+                    if (moveErrors.isNotEmpty()) operationErrors = moveErrors
+                }
+            }
+        } else {
+            val skipped = batch.size + moveQueue.size
+            moveQueue = emptyList()
+            activeMove = emptyList()
+            notice = "已取消移動（尚未處理 $skipped 個），原始檔案保留"
+        }
+    }
+    LaunchedEffect(moveQueue, activeMove) {
+        if (moveQueue.isNotEmpty() && activeMove.isEmpty()) {
+            val batch = moveQueue.take(100)
+            activeMove = batch
+            moveQueue = moveQueue.drop(batch.size)
+            try {
+                val request = MediaStore.createWriteRequest(
+                    context.contentResolver, batch.map { it.uri })
+                moveLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
+            } catch (e: Exception) {
+                moveErrors = moveErrors + "Android 寫入授權失敗：${e.message ?: e.javaClass.simpleName}"
+                operationErrors = moveErrors
+                notice = "移動失敗，請檢查媒體管理權限"
+                activeMove = emptyList()
+                moveQueue = emptyList()
+            }
+        }
+    }
+
     val inViewer = viewerItems?.getOrNull(viewerIndex)
     BackHandler(inViewer != null) { viewerItems = null }
     BackHandler(inViewer == null && browserMode == "資料夾" && folder.isNotBlank()) {
@@ -215,11 +264,18 @@ private fun MyPlayerApp() {
         ViewerScreen(
             media = inViewer,
             onBack = { viewerItems = null },
-            onChange = { step -> viewerIndex = (viewerIndex + step).coerceIn(0, viewing.lastIndex) },
+            onChange = { step ->
+                val next = (viewerIndex + step).coerceIn(0, viewing.lastIndex)
+                if (next != viewerIndex) {
+                    viewerIndex = next
+                    true
+                } else false
+            },
             onDelete = { requestDelete(listOf(inViewer)) },
             onRepairMp4 = { showRepairPrompt = inViewer },
             onPlaybackSettings = { showSettings = true },
-            progressScale = progressSize, progressWidth = progressWidth
+            progressScale = progressSize, progressWidth = progressWidth,
+            progressOpacity = progressOpacity
         )
     } else {
         GalleryScreen(
@@ -281,18 +337,43 @@ private fun MyPlayerApp() {
             onApply = { target ->
                 showFolderPicker = false
                 val source = operationItems
-                scope.launch {
-                    notice = "${operation}中：${source.size} 個檔案"
-                    val result = MediaOperations.copy(context, source, target)
-                    notice = "已${operation} ${result.copied.size} 個" +
-                        if (result.failures.isNotEmpty()) "；失敗 ${result.failures.size} 個" else ""
-                    selected = selected - result.copied.map { it.source.key }.toSet()
-                    refresh()
-                    if (operation == "移動" && result.copied.isNotEmpty()) {
-                        // Copy first, then request Android deletion. If rejected, source remains.
-                        requestDelete(result.copied.map { it.source }, isMove = true)
+                if (operation == "移動") {
+                    moveTarget = target
+                    movedCount = 0
+                    moveErrors = emptyList()
+                    activeMove = emptyList()
+                    moveQueue = source.distinctBy { it.key }
+                    notice = "準備移動 ${source.size} 個檔案"
+                } else {
+                    scope.launch {
+                        notice = "複製中：${source.size} 個檔案"
+                        val result = MediaOperations.copy(context, source, target)
+                        notice = "複製完成：成功 ${result.copied.size} 個，失敗 ${result.failures.size} 個"
+                        if (result.failures.isNotEmpty()) operationErrors = result.failures
+                        selected = selected - result.copied.map { it.source.key }.toSet()
+                        refresh()
                     }
                 }
+            }
+        )
+    }
+
+    if (operationErrors.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { operationErrors = emptyList() },
+            title = { Text("檔案操作失敗原因") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("成功移動的檔案不會重新複製；失敗的原始檔案仍留在原處。")
+                    Spacer(Modifier.height(8.dp))
+                    Text(operationErrors.take(8).joinToString("\n\n"),
+                        style = MaterialTheme.typography.bodySmall)
+                    if (operationErrors.size > 8)
+                        Text("另有 ${operationErrors.size - 8} 個錯誤")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { operationErrors = emptyList() }) { Text("關閉") }
             }
         )
     }
@@ -341,14 +422,16 @@ private fun MyPlayerApp() {
 
     if (showSettings) {
         PlaybackSettingsDialog(
-            size = progressSize, width = progressWidth,
+            size = progressSize, width = progressWidth, opacity = progressOpacity,
             canManage = Build.VERSION.SDK_INT >= 31 && MediaStore.canManageMedia(context),
             onDismiss = { showSettings = false },
-            onSave = { size, width ->
+            onSave = { size, width, opacity ->
                 progressSize = PlayerMath.progressScale(size)
                 progressWidth = PlayerMath.progressWidth(width)
+                progressOpacity = PlayerMath.progressOpacity(opacity)
                 prefs.edit().putFloat("progress_size", progressSize)
-                    .putFloat("progress_width", progressWidth).apply()
+                    .putFloat("progress_width", progressWidth)
+                    .putFloat("progress_opacity", progressOpacity).apply()
                 showSettings = false
             },
             onRequestManage = {
@@ -363,13 +446,14 @@ private fun MyPlayerApp() {
 
 @Composable
 private fun PlaybackSettingsDialog(
-    size: Float, width: Float, canManage: Boolean,
+    size: Float, width: Float, opacity: Float, canManage: Boolean,
     onDismiss: () -> Unit,
-    onSave: (Float, Float) -> Unit,
+    onSave: (Float, Float, Float) -> Unit,
     onRequestManage: () -> Unit
 ) {
     var scale by remember(size) { mutableFloatStateOf(size) }
     var barWidth by remember(width) { mutableFloatStateOf(width) }
+    var barOpacity by remember(opacity) { mutableFloatStateOf(opacity) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("播放器設定") },
@@ -379,6 +463,9 @@ private fun PlaybackSettingsDialog(
                 Slider(value = scale, onValueChange = { scale = it }, valueRange = .8f..2.5f)
                 Text("進度條寬度：${(barWidth * 100).toInt()}%")
                 Slider(value = barWidth, onValueChange = { barWidth = it }, valueRange = .6f..1f)
+                Text("進度條透明度：${((1f - barOpacity) * 100).toInt()}%（越高越透明）")
+                Slider(value = barOpacity, onValueChange = { barOpacity = it },
+                    valueRange = .15f..1f)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Text(if (canManage) "媒體管理權限：已啟用"
                      else "媒體管理權限：未啟用（刪除時由 Android 再次確認）",
@@ -388,7 +475,7 @@ private fun PlaybackSettingsDialog(
                     color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(scale, barWidth) }) { Text("儲存") } },
-        dismissButton = { TextButton(onClick = { onSave(1f, .96f) }) { Text("恢復預設") } }
+        confirmButton = { TextButton(onClick = { onSave(scale, barWidth, barOpacity) }) { Text("儲存") } },
+        dismissButton = { TextButton(onClick = { onSave(1f, .96f, .72f) }) { Text("恢復預設") } }
     )
 }

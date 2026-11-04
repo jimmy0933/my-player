@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,12 +54,13 @@ private val Muted = Color(0xFFC8D3E7)
 fun ViewerScreen(
     media: LocalMedia,
     onBack: () -> Unit,
-    onChange: (Int) -> Unit,
+    onChange: (Int) -> Boolean,
     onDelete: () -> Unit,
     onRepairMp4: () -> Unit,
     onPlaybackSettings: () -> Unit,
     progressScale: Float,
-    progressWidth: Float
+    progressWidth: Float,
+    progressOpacity: Float
 ) {
     val context = LocalContext.current
     val config = LocalConfiguration.current
@@ -90,6 +93,7 @@ fun ViewerScreen(
     var playing by remember(media.key) { mutableStateOf(media.isVideo) }
     var controlsVisible by remember(media.key) { mutableStateOf(true) }
     var seekHint by remember(media.key) { mutableStateOf<String?>(null) }
+    var switchHint by remember { mutableStateOf<Int?>(null) }
     var previewMenuOpen by remember(media.key) { mutableStateOf(false) }
     var interaction by remember(media.key) { mutableIntStateOf(0) }
     var lastTapTime by remember(media.key) { mutableLongStateOf(-1L) }
@@ -125,6 +129,12 @@ fun ViewerScreen(
             delay(2_000)
             controlsVisible = false
         } else controlsVisible = true
+    }
+    LaunchedEffect(switchHint) {
+        if (switchHint != null) {
+            delay(520)
+            switchHint = null
+        }
     }
     val duration = (player?.duration?.takeIf { it > 0L } ?: media.durationMs).coerceAtLeast(0L)
     val fraction = if (duration > 0L) (currentMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
@@ -222,7 +232,8 @@ fun ViewerScreen(
                 if (!transformed && !wasSeek && zoom <= 1.01f &&
                     abs(dy) > verticalLimit && abs(dy) > abs(dx) * 1.2f) {
                     pendingTap?.cancel(); pendingTap = null; lastTapTime = -1
-                    onChange(if (dy < 0) 1 else -1)
+                    val direction = if (dy < 0) 1 else -1
+                    if (onChange(direction)) switchHint = direction
                 } else if (isTap) {
                     val isCentral = PlayerMath.centerTap(down.position.x, down.position.y,
                         size.width.toFloat(), size.height.toFloat())
@@ -258,6 +269,19 @@ fun ViewerScreen(
                 modifier = Modifier.align(Alignment.Center)
                     .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 18.dp, vertical = 10.dp))
+        }
+        switchHint?.let { direction ->
+            Box(Modifier.align(Alignment.Center)
+                .background(Color.Black.copy(alpha = .32f), CircleShape)
+                .padding(7.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    if (direction > 0) Icons.Default.KeyboardArrowUp
+                    else Icons.Default.KeyboardArrowDown,
+                    if (direction > 0) "已切換下一個" else "已切換上一個",
+                    tint = Color.White.copy(alpha = .87f),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
         }
         if (controlsVisible) {
             // The viewer remains edge-to-edge. Only a thin transparent top overlay
@@ -336,7 +360,7 @@ fun ViewerScreen(
                         style = MaterialTheme.typography.labelSmall
                     )
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        Timeline(fraction, seekToFraction, progressScale, progressWidth)
+                        Timeline(fraction, seekToFraction, progressScale, progressWidth, progressOpacity)
                     }
                     Text(
                         PlayerMath.durationLabel(duration),
@@ -351,20 +375,28 @@ fun ViewerScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Timeline(value: Float, onChange: (Float) -> Unit, size: Float, width: Float) {
+private fun Timeline(
+    value: Float, onChange: (Float) -> Unit, size: Float, width: Float, opacity: Float
+) {
     val clampedSize = PlayerMath.progressScale(size)
+    val alpha = PlayerMath.progressOpacity(opacity)
+    val trackColor = Accent.copy(alpha = alpha)
     Slider(value = value.coerceIn(0f, 1f), onValueChange = onChange,
         modifier = Modifier.fillMaxWidth(PlayerMath.progressWidth(width))
             .height((30 * clampedSize).dp),
-        colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent),
+        colors = SliderDefaults.colors(
+            thumbColor = trackColor,
+            activeTrackColor = trackColor,
+            inactiveTrackColor = Color.White.copy(alpha = .2f * alpha)
+        ),
         thumb = {
-            Box(Modifier.size((10 * clampedSize).dp).background(Accent, CircleShape))
+            Box(Modifier.size((10 * clampedSize).dp).background(trackColor, CircleShape))
         },
         track = { state ->
             Box(Modifier.fillMaxWidth().height((3 * clampedSize).dp)
-                .background(Color.White.copy(alpha = .25f), CircleShape)) {
+                .background(Color.White.copy(alpha = .25f * alpha), CircleShape)) {
                 Box(Modifier.fillMaxWidth(state.value.coerceIn(0f, 1f)).fillMaxHeight()
-                    .background(Accent, CircleShape))
+                    .background(trackColor, CircleShape))
             }
         }
     )

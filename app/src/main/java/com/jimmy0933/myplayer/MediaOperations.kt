@@ -14,6 +14,48 @@ import java.nio.ByteBuffer
 object MediaOperations {
     data class Copied(val source: LocalMedia, val destination: Uri)
     data class Result(val copied: List<Copied>, val failures: List<String>)
+    data class MoveResult(val moved: List<LocalMedia>, val failures: List<String>)
+
+    /**
+     * Relocate the existing MediaStore item instead of making a full-sized
+     * duplicate first. Call only after createWriteRequest approval for
+     * non-owned media. On failure the original stays in place.
+     */
+    suspend fun move(context: Context, entries: List<LocalMedia>, folder: String): MoveResult =
+        withContext(Dispatchers.IO) {
+            val moved = mutableListOf<LocalMedia>()
+            val failures = mutableListOf<String>()
+            val resolver = context.contentResolver
+            for (item in entries) {
+                try {
+                    val destination = cleanFolder(folder, item.isVideo)
+                    if (item.relativePath.trimEnd('/') == destination.trimEnd('/')) {
+                        moved += item
+                        continue
+                    }
+                    val values = ContentValues().apply {
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, destination)
+                    }
+                    val updated = resolver.update(item.uri, values, null, null)
+                    check(updated == 1) { "系統未允許更新檔案位置" }
+                    // Verify actual location rather than reporting success on a
+                    // provider that silently ignores RELATIVE_PATH.
+                    val storedPath = resolver.query(
+                        item.uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH),
+                        null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                    check(storedPath?.trimEnd('/') == destination.trimEnd('/')) {
+                        "檔案位置未更新，請檢查資料夾是否支援此媒體格式"
+                    }
+                    moved += item
+                } catch (e: Exception) {
+                    failures += "${item.name}：${e.message ?: e.javaClass.simpleName}"
+                }
+            }
+            MoveResult(moved, failures)
+        }
 
     /** Copy into an in-app chosen MediaStore folder, never launch an empty external SAF picker. */
     suspend fun copy(context: Context, entries: List<LocalMedia>, folder: String): Result = withContext(Dispatchers.IO) {

@@ -107,7 +107,7 @@ fun GalleryScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(UiColors.Background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(UiColors.Background).statusBarsPadding().navigationBarsPadding()) {
         // Only one compact title/action row. Bulk actions live in the top-right overflow.
         Row(
             Modifier.fillMaxWidth().height(52.dp)
@@ -445,8 +445,10 @@ fun GalleryScreen(
                     }
                 }
             }
-            SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter))
         }
+        // Allocate room for feedback instead of covering the grid or system navigation.
+        SnackbarHost(hostState = snackbar,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
         // Deliberately NO bottom bulk-action strip. All actions live in the top-right menu.
     }
 }
@@ -518,51 +520,18 @@ private fun MediaTile(
                 )
             }
             if (entry.isVideo) {
-                if (listMode) {
-                    // List mode shows the size alongside the folder name below.
-                    // Keep just the duration on the 96dp preview.
-                    Text(
-                        PlayerMath.durationLabel(entry.durationMs),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        modifier = Modifier.align(Alignment.BottomEnd)
-                            .padding(4.dp)
-                            .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
-                } else {
-                    // Compact labels across the thumbnail bottom edge. Each
-                    // gets its own available width, so a long duration or
-                    // multi-GB size cannot overlap the adjacent label.
-                    Row(
-                        Modifier.align(Alignment.BottomCenter)
-                            .fillMaxWidth().padding(horizontal = 3.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Text(
-                            readableSize(entry.size),
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                                .background(Color.Black.copy(alpha = .8f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 3.dp, vertical = 1.dp)
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            PlayerMath.durationLabel(entry.durationMs),
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            modifier = Modifier.background(
-                                Color.Black.copy(alpha = .8f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 3.dp, vertical = 1.dp)
-                        )
-                    }
-                }
+                // Only the duration in the bottom-right corner. No size badge
+                // across the thumbnail; a soft, translucent backing preserves video.
+                Text(
+                    PlayerMath.durationLabel(entry.durationMs),
+                    color = Color.White.copy(alpha = .88f),
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                        .background(Color.Black.copy(alpha = .36f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 3.dp, vertical = 1.dp)
+                )
             }
         }
     }

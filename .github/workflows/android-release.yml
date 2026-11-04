@@ -104,10 +104,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.3-signed.apk
+            NAME=MyPlayer-v1.1.4-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.3-debug-signed.apk
+            NAME=MyPlayer-v1.1.4-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -123,12 +123,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.3"
+          TAG="v1.1.4"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.3 · rebuilt native Android app
+          # My Player v1.1.4 · rebuilt native Android app
 
-          Video list: display readable file size (KB/MB/GB) next to duration
-          in video thumbnail mode, and next to folder details in list mode.
+          Thumbnail video badges now show only a translucent duration at bottom right;
+          file size stays in list view. A brief arrow confirms vertical swipe navigation.
+          Move uses Android-authorized MediaStore relocation rather than copy-then-delete;
+          a failure dialog shows the actual reason and original files remain safe.
+          Timeline opacity and thickness can be adjusted in persistent playback settings.
           Folder navigation: high-contrast folder titles and compact rows; browse immediate
           subfolders from the media root; back goes one level; restart opens at root.
           Content-first redesign: compact gallery tabs, full-size media tiles, long-press selection only,\n          top-right copy/move/delete/favorites, full-screen photo and video, minimal timeline.\n          Restored: gallery, video/photo browsing, search, folders, favorites, configurable playback timeline,
@@ -142,9 +145,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.3 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.4 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.3 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.4 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
