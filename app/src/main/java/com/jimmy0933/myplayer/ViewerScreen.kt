@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -358,9 +359,11 @@ fun ViewerScreen(
                     )
                     .navigationBarsPadding()
                     .padding(horizontal = if (isLandscape) 8.dp else 10.dp)
+                    // Increase touch area toward the system navigation bar while
+                    // preserving the progress line's center at its old position.
                     .padding(
                         top = 2.dp,
-                        bottom = if (isLandscape) 20.dp else 36.dp
+                        bottom = if (isLandscape) 6.dp else 10.dp
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -380,7 +383,8 @@ fun ViewerScreen(
                 }
                 Timeline(
                     fraction, seekToFraction, progressScale,
-                    progressOpacity, controlsVisible
+                    progressOpacity, controlsVisible,
+                    touchHeight = if (isLandscape) 80.dp else 104.dp
                 )
             }
         }
@@ -395,16 +399,20 @@ internal fun Timeline(
     onChange: (Float) -> Unit,
     size: Float,
     opacity: Float,
-    controlsVisible: Boolean = true
+    controlsVisible: Boolean = true,
+    touchHeight: Dp = 52.dp
 ) {
     val thickness = PlayerMath.progressThicknessDp(size)
     val alpha = PlayerMath.progressOpacity(opacity)
     val played = Accent.copy(alpha = alpha)
     val unplayed = Color.White.copy(alpha = .28f * alpha)
+    // Transparent vertical hit target (up to 104dp) makes tapping or
+    // dragging reliable even when the visible line is only 2dp thick.
+    // Custom track keeps the saved thickness and opacity independent of touch size.
     Slider(
         value = value.coerceIn(0f, 1f),
         onValueChange = onChange,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
+        modifier = Modifier.fillMaxWidth().height(touchHeight),
         colors = SliderDefaults.colors(
             thumbColor = played,
             activeTrackColor = played,
