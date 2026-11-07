@@ -95,11 +95,14 @@ fun ViewerScreen(
     var playing by remember(media.key) { mutableStateOf(media.isVideo) }
     var controlsVisible by remember(media.key) { mutableStateOf(true) }
     var seekHint by remember(media.key) { mutableStateOf<String?>(null) }
+    var doubleTapHint by remember(media.key) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var doubleTapCount by remember(media.key) { mutableIntStateOf(0) }
     var switchHint by remember { mutableStateOf<Int?>(null) }
     var previewMenuOpen by remember(media.key) { mutableStateOf(false) }
     var interaction by remember(media.key) { mutableIntStateOf(0) }
     var lastTapTime by remember(media.key) { mutableLongStateOf(-1L) }
     var lastTapPoint by remember(media.key) { mutableStateOf(Offset.Zero) }
+    var lastTapSide by remember(media.key) { mutableIntStateOf(0) }
     var pendingTap by remember(media.key) { mutableStateOf<Job?>(null) }
 
     fun showControls() { controlsVisible = true; interaction++ }
@@ -136,6 +139,12 @@ fun ViewerScreen(
         if (switchHint != null) {
             delay(520)
             switchHint = null
+        }
+    }
+    LaunchedEffect(doubleTapHint) {
+        if (doubleTapHint != null) {
+            delay(750)
+            doubleTapHint = null
         }
     }
     val duration = (player?.duration?.takeIf { it > 0L } ?: media.durationMs).coerceAtLeast(0L)
@@ -243,31 +252,66 @@ fun ViewerScreen(
                         switchHint = direction
                     }
                 } else if (isTap) {
-                    val isCentral = PlayerMath.centerTap(down.position.x, down.position.y,
-                        size.width.toFloat(), size.height.toFloat())
+                    val side = if (media.isVideo) {
+                        PlayerMath.doubleTapSeekSide(down.position.x, size.width.toFloat())
+                    } else 0
+                    val isCentral = side == 0 && PlayerMath.centerTap(
+                        down.position.x, down.position.y,
+                        size.width.toFloat(), size.height.toFloat()
+                    )
                     fun singleTap() {
                         if (media.isVideo) {
                             if (isCentral) togglePlayback() else showControls()
                         } else controlsVisible = !controlsVisible
                     }
                     val now = down.uptimeMillis
-                    val doubleTap = zoom > 1.01f && lastTapTime >= 0 &&
-                        now - lastTapTime <= 330 &&
+                    val doubleTap = lastTapTime >= 0 &&
+                        now - lastTapTime in 0..330 &&
                         (down.position - lastTapPoint).getDistance() <= with(density) { 48.dp.toPx() }
-                    if (doubleTap) {
-                        pendingTap?.cancel(); pendingTap = null; lastTapTime = -1
+                    if (doubleTap && zoom > 1.01f) {
+                        // Keep the existing two-tap zoom-reset gesture.
+                        pendingTap?.cancel(); pendingTap = null
+                        lastTapTime = -1; lastTapSide = 0
                         zoom = 1f; translation = Offset.Zero; showControls()
-                    } else if (zoom > 1.01f) {
-                        pendingTap?.cancel(); lastTapTime = now; lastTapPoint = down.position
-                        pendingTap = scope.launch {
-                            delay(310); singleTap(); lastTapTime = -1; pendingTap = null
+                    } else if (doubleTap && media.isVideo && side != 0 &&
+                        side == lastTapSide && zoom <= 1.01f
+                    ) {
+                        pendingTap?.cancel(); pendingTap = null
+                        lastTapTime = -1; lastTapSide = 0
+                        val engine = player
+                        if (engine != null) {
+                            val actualDuration = engine.duration.takeIf { it > 0L }
+                                ?: media.durationMs
+                            val target = PlayerMath.doubleTapSeekPosition(
+                                engine.currentPosition, side, actualDuration
+                            )
+                            engine.seekTo(target)
+                            currentMs = target
+                            doubleTapCount++
+                            doubleTapHint = side to doubleTapCount
+                            showControls()
                         }
+                    } else if (zoom > 1.01f) {
+                        pendingTap?.cancel()
+                        lastTapTime = now; lastTapPoint = down.position; lastTapSide = side
+                        pendingTap = scope.launch {
+                            delay(310)
+                            singleTap()
+                            lastTapTime = -1; lastTapSide = 0; pendingTap = null
+                        }
+                    } else if (media.isVideo && side != 0) {
+                        // A single edge tap only reveals controls. A second tap
+                        // on the same side seeks, without toggling playback.
+                        pendingTap?.cancel(); pendingTap = null
+                        lastTapTime = now; lastTapPoint = down.position; lastTapSide = side
+                        showControls()
                     } else {
                         pendingTap?.cancel(); pendingTap = null
-                        lastTapTime = -1; singleTap()
+                        lastTapTime = -1; lastTapSide = 0; singleTap()
                     }
                 } else {
-                    pendingTap?.cancel(); pendingTap = null; lastTapTime = -1
+                    pendingTap?.cancel(); pendingTap = null
+                    lastTapTime = -1; lastTapSide = 0
                 }
                 seekHint = null
             }
@@ -277,6 +321,22 @@ fun ViewerScreen(
                 modifier = Modifier.align(Alignment.Center)
                     .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 18.dp, vertical = 10.dp))
+        }
+        doubleTapHint?.let { (side, _) ->
+            Box(
+                Modifier.align(if (side < 0) Alignment.CenterStart else Alignment.CenterEnd)
+                    .padding(horizontal = 28.dp)
+                    .background(Color.Black.copy(alpha = .65f), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (side < 0) "◀◀  -10 秒" else "+10 秒  ▶▶",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
         switchHint?.let { direction ->
             Box(Modifier.align(Alignment.Center)
