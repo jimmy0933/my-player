@@ -37,6 +37,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import android.view.LayoutInflater
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -151,7 +152,8 @@ fun ViewerScreen(
     Box(Modifier.fillMaxSize().background(Background), contentAlignment = Alignment.Center) {
         if (media.isVideo) {
             AndroidView(
-                factory = { ctx -> PlayerView(ctx).apply {
+                factory = { ctx ->
+                    (LayoutInflater.from(ctx).inflate(R.layout.view_player, null, false) as PlayerView).apply {
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     this.player = playbackEngine
@@ -234,7 +236,12 @@ fun ViewerScreen(
                     abs(dy) > verticalLimit && abs(dy) > abs(dx) * 1.2f) {
                     pendingTap?.cancel(); pendingTap = null; lastTapTime = -1
                     val direction = if (dy < 0) 1 else -1
-                    if (onChange(direction)) switchHint = direction
+                    if (onChange(direction)) {
+                        // The outgoing video's image keeps sliding, but its
+                        // audio stops immediately before the next player starts.
+                        player?.pause()
+                        switchHint = direction
+                    }
                 } else if (isTap) {
                     val isCentral = PlayerMath.centerTap(down.position.x, down.position.y,
                         size.width.toFloat(), size.height.toFloat())
