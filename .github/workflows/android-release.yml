@@ -85,6 +85,14 @@ jobs:
           grep -Fq 'ExternalVideoIntents.asMedia' "$MAIN"
           grep -Fq 'isExternalVideo = openedExternally' "$MAIN"
           grep -Fq 'request.uri' "$EXTERNAL"
+          PLAYER_LAYOUT=app/src/main/res/layout/view_player.xml
+          grep -Fq 'mediaTransition.AnimatedContent(' "$MAIN"
+          grep -Fq 'slideInVertically(' "$MAIN"
+          grep -Fq 'slideOutVertically(' "$MAIN"
+          grep -Fq 'mediaTransition.isRunning' "$MAIN"
+          grep -Fq 'player?.pause()' "$VIEWER"
+          grep -Fq 'app:surface_type="texture_view"' "$PLAYER_LAYOUT"
+          echo "Vertical video slide and animatable video surface rules PASS"
           echo "External video intent support and safe playback rules PASS"
           echo "Gallery pull-to-refresh, compact layout and timeline-only viewer rules PASS"
 
@@ -128,10 +136,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.10-signed.apk
+            NAME=MyPlayer-v1.1.11-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.10-debug-signed.apk
+            NAME=MyPlayer-v1.1.11-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -147,9 +155,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.10"
+          TAG="v1.1.11"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.10 · play downloaded videos with My Player
+          # My Player v1.1.11 · smooth vertical video transitions
+
+          Swiping up slides the current video off the top while the next
+          video enters from the bottom. Swiping down reverses that motion.
+          Animations last 360ms, use clipped full-screen frames, and guard
+          against repeated swipes mid-transition. A TextureView-based video
+          surface makes the actual video frames move with the UI. The outgoing
+          player pauses before the next one starts, preventing overlapping audio.
+
+          ## Previous version
+          External playback from my-download, direct video URI launch, and
+          gallery permission behavior from v1.1.10 remain supported.
 
           Registered Android ACTION_VIEW video/* handlers for content:// and
           file:// videos, including downloads opened from my-download.
@@ -203,9 +222,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.10 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.11 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.10 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.11 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
