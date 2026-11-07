@@ -89,6 +89,21 @@ object PlayerMath {
     fun centerTap(x: Float, y: Float, width: Float, height: Float): Boolean =
         width > 0 && height > 0 && x in (width * .25f)..(width * .75f) &&
             y in (height * .28f)..(height * .64f)
+
+    /** -1 = rewind (left 30%), +1 = forward (right 30%), 0 = center/outside. */
+    fun doubleTapSeekSide(x: Float, width: Float): Int = when {
+        !x.isFinite() || !width.isFinite() || width <= 0f || x < 0f || x > width -> 0
+        x < width * .30f -> -1
+        x >= width * .70f -> 1
+        else -> 0
+    }
+
+    /** Clamps double-tap seek at the beginning and, if known, at the end. */
+    fun doubleTapSeekPosition(currentMs: Long, side: Int, durationMs: Long): Long {
+        val delta = side.coerceIn(-1, 1) * 10_000L
+        val target = (currentMs.coerceAtLeast(0L) + delta).coerceAtLeast(0L)
+        return if (durationMs > 0L) target.coerceAtMost(durationMs) else target
+    }
     fun videoNeighbor(videoIndices: List<Boolean>, index: Int, step: Int): Int? {
         if (index !in videoIndices.indices || step == 0) return null
         var p = index + if (step > 0) 1 else -1
