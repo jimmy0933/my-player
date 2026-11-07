@@ -314,8 +314,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                     animationSpec = tween(360, easing = FastOutSlowInEasing),
                     targetOffsetY = { height -> -height * direction }
                 )
-            },
-            label = "media-slide"
+            }
         ) { index ->
             val displayed = viewing.getOrNull(index)
             if (displayed != null) {
