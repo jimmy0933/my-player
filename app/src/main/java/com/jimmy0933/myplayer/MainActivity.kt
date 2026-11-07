@@ -14,8 +14,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -288,22 +296,51 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     }
     if (inViewer != null) {
         val viewing = viewerItems.orEmpty()
-        ViewerScreen(
-            media = inViewer,
-            onBack = { closeViewer() },
-            onChange = { step ->
-                val next = (viewerIndex + step).coerceIn(0, viewing.lastIndex)
-                if (next != viewerIndex) {
-                    viewerIndex = next
-                    true
-                } else false
-            },
-            onDelete = { requestDelete(listOf(inViewer)) },
-            onRepairMp4 = { showRepairPrompt = inViewer },
-            onPlaybackSettings = { showSettings = true },
-            progressScale = progressSize, progressOpacity = progressOpacity,
-            isExternalVideo = openedExternally
+        // Keep both frames during a vertical transition. Each outgoing view
+        // retains its own video surface until the slide finishes.
+        val mediaTransition = updateTransition(
+            targetState = viewerIndex,
+            label = "vertical-media-navigation"
         )
+        mediaTransition.AnimatedContent(
+            modifier = Modifier.fillMaxSize().clipToBounds(),
+            contentKey = { index -> viewing.getOrNull(index)?.key ?: index },
+            transitionSpec = {
+                val direction = if (targetState > initialState) 1 else -1
+                slideInVertically(
+                    animationSpec = tween(360, easing = FastOutSlowInEasing),
+                    initialOffsetY = { height -> height * direction }
+                ) togetherWith slideOutVertically(
+                    animationSpec = tween(360, easing = FastOutSlowInEasing),
+                    targetOffsetY = { height -> -height * direction }
+                )
+            },
+            label = "media-slide"
+        ) { index ->
+            val displayed = viewing.getOrNull(index)
+            if (displayed != null) {
+                ViewerScreen(
+                    media = displayed,
+                    onBack = { closeViewer() },
+                    onChange = { step ->
+                        if (mediaTransition.isRunning) {
+                            false
+                        } else {
+                            val next = (viewerIndex + step).coerceIn(0, viewing.lastIndex)
+                            if (next != viewerIndex) {
+                                viewerIndex = next
+                                true
+                            } else false
+                        }
+                    },
+                    onDelete = { requestDelete(listOf(displayed)) },
+                    onRepairMp4 = { showRepairPrompt = displayed },
+                    onPlaybackSettings = { showSettings = true },
+                    progressScale = progressSize, progressOpacity = progressOpacity,
+                    isExternalVideo = openedExternally
+                )
+            }
+        }
     } else {
         GalleryScreen(
             allMedia = gallery, visibleMedia = visible,
