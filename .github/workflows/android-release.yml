@@ -96,7 +96,10 @@ jobs:
           TEST=app/src/test/java/com/jimmy0933/myplayer/PlayerMathTest.kt
           grep -Fq 'PlayerMath.doubleTapSeekSide(' "$VIEWER"
           grep -Fq 'PlayerMath.doubleTapSeekPosition(' "$VIEWER"
-          grep -Fq 'doubleTapHint = side to doubleTapCount' "$VIEWER"
+          if grep -Eq 'doubleTapHint|doubleTapCount|seekHint' "$VIEWER"; then
+            echo "ERROR: Seeking must not cover the video with text overlays"
+            exit 1
+          fi
           grep -Fq 'fun doubleTapSeekSide(' "$MATH"
           grep -Fq 'fun doubleTapSeekPosition(' "$MATH"
           grep -Fq 'doubleTapSeekZonesAndVideoBounds' "$TEST"
@@ -145,10 +148,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.12-signed.apk
+            NAME=MyPlayer-v1.1.13-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.12-debug-signed.apk
+            NAME=MyPlayer-v1.1.13-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -164,16 +167,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.12"
+          TAG="v1.1.13"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.12 · double-tap video seek
+          # My Player v1.1.13 · unobstructed video seeking
 
-          Double tap the left 30% of a playing video to rewind 10 seconds,
-          or the right 30% to advance 10 seconds. A brief on-screen indicator
-          confirms each seek. Seeking clamps safely at video bounds.
-          Single tapping the edges only shows controls, while center tapping
-          still toggles playback. Pinch zoom, the zoom-reset double tap, and
-          vertical swipe transitions are preserved.
+          Removed the large +10/-10 second text overlays while double
+          tapping either edge, and also removed the centered time popup
+          during horizontal drag seeking. Videos remain unobstructed while
+          seeking; the existing playback timeline still updates normally.
+          Left/right double tap still seeks backward/forward 10 seconds.
+          Vertical media transitions, zoom and external playback stay intact.
 
           Swiping up slides the current video off the top while the next
           video enters from the bottom. Swiping down reverses that motion.
@@ -238,9 +241,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.12 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.13 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.12 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.13 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
