@@ -60,7 +60,8 @@ fun ViewerScreen(
     onRepairMp4: () -> Unit,
     onPlaybackSettings: () -> Unit,
     progressScale: Float,
-    progressOpacity: Float
+    progressOpacity: Float,
+    isExternalVideo: Boolean = false
 ) {
     val context = LocalContext.current
     val config = LocalConfiguration.current
@@ -295,7 +296,7 @@ fun ViewerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { previewMenuOpen = false; onBack() }) {
-                    Icon(Icons.Default.ArrowBack, "返回相簿", tint = Color.White)
+                    Icon(Icons.Default.ArrowBack, if (isExternalVideo) "返回原 App" else "返回相簿", tint = Color.White)
                 }
                 Text(
                     media.name,
@@ -322,7 +323,7 @@ fun ViewerScreen(
                                 onPlaybackSettings()
                             }
                         )
-                        if (media.isVideo) {
+                        if (media.isVideo && !isExternalVideo) {
                             DropdownMenuItem(
                                 text = { Text("建立可快轉的 MP4 副本") },
                                 onClick = {
@@ -332,7 +333,7 @@ fun ViewerScreen(
                                 }
                             )
                         }
-                        DropdownMenuItem(
+                        if (!isExternalVideo) DropdownMenuItem(
                             text = { Text("刪除目前檔案", color = Color(0xFFFFA4A9)) },
                             onClick = {
                                 previewMenuOpen = false
