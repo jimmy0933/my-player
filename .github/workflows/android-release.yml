@@ -92,6 +92,15 @@ jobs:
           grep -Fq 'mediaTransition.isRunning' "$MAIN"
           grep -Fq 'player?.pause()' "$VIEWER"
           grep -Fq 'app:surface_type="texture_view"' "$PLAYER_LAYOUT"
+          MATH=app/src/main/java/com/jimmy0933/myplayer/MediaLibrary.kt
+          TEST=app/src/test/java/com/jimmy0933/myplayer/PlayerMathTest.kt
+          grep -Fq 'PlayerMath.doubleTapSeekSide(' "$VIEWER"
+          grep -Fq 'PlayerMath.doubleTapSeekPosition(' "$VIEWER"
+          grep -Fq 'doubleTapHint = side to doubleTapCount' "$VIEWER"
+          grep -Fq 'fun doubleTapSeekSide(' "$MATH"
+          grep -Fq 'fun doubleTapSeekPosition(' "$MATH"
+          grep -Fq 'doubleTapSeekZonesAndVideoBounds' "$TEST"
+          echo "Double-tap video seeking and boundary tests PASS"
           echo "Vertical video slide and animatable video surface rules PASS"
           echo "External video intent support and safe playback rules PASS"
           echo "Gallery pull-to-refresh, compact layout and timeline-only viewer rules PASS"
@@ -136,10 +145,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.11-signed.apk
+            NAME=MyPlayer-v1.1.12-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.11-debug-signed.apk
+            NAME=MyPlayer-v1.1.12-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -155,9 +164,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.11"
+          TAG="v1.1.12"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.11 · smooth vertical video transitions
+          # My Player v1.1.12 · double-tap video seek
+
+          Double tap the left 30% of a playing video to rewind 10 seconds,
+          or the right 30% to advance 10 seconds. A brief on-screen indicator
+          confirms each seek. Seeking clamps safely at video bounds.
+          Single tapping the edges only shows controls, while center tapping
+          still toggles playback. Pinch zoom, the zoom-reset double tap, and
+          vertical swipe transitions are preserved.
 
           Swiping up slides the current video off the top while the next
           video enters from the bottom. Swiping down reverses that motion.
@@ -222,9 +238,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.11 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.12 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.11 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.12 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
