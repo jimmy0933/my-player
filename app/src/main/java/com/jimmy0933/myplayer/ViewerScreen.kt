@@ -94,9 +94,6 @@ fun ViewerScreen(
     var currentMs by remember(media.key) { mutableLongStateOf(0L) }
     var playing by remember(media.key) { mutableStateOf(media.isVideo) }
     var controlsVisible by remember(media.key) { mutableStateOf(true) }
-    var seekHint by remember(media.key) { mutableStateOf<String?>(null) }
-    var doubleTapHint by remember(media.key) { mutableStateOf<Pair<Int, Int>?>(null) }
-    var doubleTapCount by remember(media.key) { mutableIntStateOf(0) }
     var switchHint by remember { mutableStateOf<Int?>(null) }
     var previewMenuOpen by remember(media.key) { mutableStateOf(false) }
     var interaction by remember(media.key) { mutableIntStateOf(0) }
@@ -139,12 +136,6 @@ fun ViewerScreen(
         if (switchHint != null) {
             delay(520)
             switchHint = null
-        }
-    }
-    LaunchedEffect(doubleTapHint) {
-        if (doubleTapHint != null) {
-            delay(750)
-            doubleTapHint = null
         }
     }
     val duration = (player?.duration?.takeIf { it > 0L } ?: media.durationMs).coerceAtLeast(0L)
@@ -225,7 +216,6 @@ fun ViewerScreen(
                                 val target = PlayerMath.seek(start, dx, duration)
                                 player?.seekTo(target)
                                 currentMs = target
-                                seekHint = "${PlayerMath.durationLabel(target)} / ${PlayerMath.durationLabel(duration)}"
                                 pointer.consume()
                             } else if (zoom > 1.01f) {
                                 val deltaPan = if (media.isVideo) Offset(0f, delta.y) else delta
@@ -287,8 +277,6 @@ fun ViewerScreen(
                             )
                             engine.seekTo(target)
                             currentMs = target
-                            doubleTapCount++
-                            doubleTapHint = side to doubleTapCount
                             showControls()
                         }
                     } else if (zoom > 1.01f) {
@@ -313,31 +301,8 @@ fun ViewerScreen(
                     pendingTap?.cancel(); pendingTap = null
                     lastTapTime = -1; lastTapSide = 0
                 }
-                seekHint = null
             }
         })
-        seekHint?.let { hint ->
-            Text(hint, color = Color.White, fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Center)
-                    .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 18.dp, vertical = 10.dp))
-        }
-        doubleTapHint?.let { (side, _) ->
-            Box(
-                Modifier.align(if (side < 0) Alignment.CenterStart else Alignment.CenterEnd)
-                    .padding(horizontal = 28.dp)
-                    .background(Color.Black.copy(alpha = .65f), RoundedCornerShape(18.dp))
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (side < 0) "◀◀  -10 秒" else "+10 秒  ▶▶",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
         switchHint?.let { direction ->
             Box(Modifier.align(Alignment.Center)
                 .background(Color.Black.copy(alpha = .32f), CircleShape)
