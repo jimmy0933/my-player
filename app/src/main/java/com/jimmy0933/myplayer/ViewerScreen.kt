@@ -266,7 +266,7 @@ fun ViewerScreen(
                     }
                     val now = down.uptimeMillis
                     val doubleTap = lastTapTime >= 0 &&
-                        now - lastTapTime in 0..330 &&
+                        now - lastTapTime in 0L..330L &&
                         (down.position - lastTapPoint).getDistance() <= with(density) { 48.dp.toPx() }
                     if (doubleTap && zoom > 1.01f) {
                         // Keep the existing two-tap zoom-reset gesture.
