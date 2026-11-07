@@ -28,8 +28,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private var externalVideoRequest by mutableStateOf<ExternalVideoRequest?>(null)
+    private var nextExternalRequestId = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        externalVideoRequest = ExternalVideoIntents.parse(intent, ++nextExternalRequestId)
         window.statusBarColor = android.graphics.Color.rgb(11, 17, 32)
         window.navigationBarColor = android.graphics.Color.rgb(11, 17, 32)
         setContent {
@@ -40,8 +44,14 @@ class MainActivity : ComponentActivity() {
                 surface = UiColors.Panel,
                 onBackground = Color.White,
                 onSurface = Color.White
-            )) { MyPlayerApp() }
+            )) { MyPlayerApp(externalVideoRequest) }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        externalVideoRequest = ExternalVideoIntents.parse(intent, ++nextExternalRequestId)
     }
 }
 
@@ -60,7 +70,7 @@ private fun hasLibraryPermission(activity: Activity): Boolean =
     }
 
 @Composable
-private fun MyPlayerApp() {
+private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     val context = LocalContext.current
     val activity = context as Activity
     val prefs = remember { context.getSharedPreferences("my_player_preferences", Activity.MODE_PRIVATE) }
@@ -81,7 +91,12 @@ private fun MyPlayerApp() {
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var favorites by remember { mutableStateOf(prefs.getStringSet("favorites", emptySet())!!.toSet()) }
     var favoriteFolders by remember { mutableStateOf(prefs.getStringSet("favorite_folders", emptySet())!!.toSet()) }
-    var viewerItems by remember { mutableStateOf<List<LocalMedia>?>(null) }
+    var viewerItems by remember {
+        mutableStateOf<List<LocalMedia>?>(
+            externalRequest?.let { listOf(ExternalVideoIntents.asMedia(context, it)) }
+        )
+    }
+    var openedExternally by remember { mutableStateOf(externalRequest != null) }
     var viewerIndex by remember { mutableIntStateOf(0) }
     var showSettings by remember { mutableStateOf(false) }
     var showFolderPicker by remember { mutableStateOf(false) }
@@ -100,6 +115,17 @@ private fun MyPlayerApp() {
     var progressSize by remember { mutableFloatStateOf(PlayerMath.progressScale(prefs.getFloat("progress_size", 1f))) }
     var progressOpacity by remember { mutableFloatStateOf(PlayerMath.progressOpacity(prefs.getFloat("progress_opacity", .72f))) }
 
+    LaunchedEffect(externalRequest?.requestId) {
+        // Receive a new external video without navigating through the gallery.
+        if (externalRequest != null) {
+            openedExternally = true
+            viewerItems = listOf(ExternalVideoIntents.asMedia(context, externalRequest))
+            viewerIndex = 0
+        }
+    }
+    fun closeViewer() {
+        if (openedExternally) activity.finish() else viewerItems = null
+    }
     fun refresh() { refreshing++ }
     fun persistFavorites(value: Set<String>) {
         favorites = value
@@ -115,14 +141,16 @@ private fun MyPlayerApp() {
         refresh()
     }
     LaunchedEffect(Unit) {
-        if (!hasLibraryPermission(activity) && !permissionAsked) {
+        if (!openedExternally && !hasLibraryPermission(activity) && !permissionAsked) {
             permissionAsked = true
             permissionsLauncher.launch(requiredPermissions())
         }
     }
-    LaunchedEffect(refreshing) {
-        loading = true
-        gallery = MediaLibrary.load(context)
+    LaunchedEffect(refreshing, openedExternally) {
+        if (!openedExternally) {
+            loading = true
+            gallery = MediaLibrary.load(context)
+        }
         loading = false
     }
     LaunchedEffect(viewerItems != null) {
@@ -253,7 +281,7 @@ private fun MyPlayerApp() {
     }
 
     val inViewer = viewerItems?.getOrNull(viewerIndex)
-    BackHandler(inViewer != null) { viewerItems = null }
+    BackHandler(inViewer != null) { closeViewer() }
     BackHandler(inViewer == null && browserMode == "資料夾" && folder.isNotBlank()) {
         folder = FolderNavigation.parent(folder)
         selected = emptySet()
@@ -262,7 +290,7 @@ private fun MyPlayerApp() {
         val viewing = viewerItems.orEmpty()
         ViewerScreen(
             media = inViewer,
-            onBack = { viewerItems = null },
+            onBack = { closeViewer() },
             onChange = { step ->
                 val next = (viewerIndex + step).coerceIn(0, viewing.lastIndex)
                 if (next != viewerIndex) {
@@ -273,7 +301,8 @@ private fun MyPlayerApp() {
             onDelete = { requestDelete(listOf(inViewer)) },
             onRepairMp4 = { showRepairPrompt = inViewer },
             onPlaybackSettings = { showSettings = true },
-            progressScale = progressSize, progressOpacity = progressOpacity
+            progressScale = progressSize, progressOpacity = progressOpacity,
+            isExternalVideo = openedExternally
         )
     } else {
         GalleryScreen(
