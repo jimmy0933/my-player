@@ -20,6 +20,24 @@ class PlayerMathTest {
         assertEquals(1, PlayerMath.videoNeighbor(listOf(false, true, false, true), 3, -1))
         assertNull(PlayerMath.videoNeighbor(listOf(false, true, false, true), 3, 1))
     }
+    @Test fun doubleTapSeekZonesAndVideoBounds() {
+        assertEquals(-1, PlayerMath.doubleTapSeekSide(10f, 1000f))
+        assertEquals(-1, PlayerMath.doubleTapSeekSide(299f, 1000f))
+        assertEquals(0, PlayerMath.doubleTapSeekSide(300f, 1000f))
+        assertEquals(0, PlayerMath.doubleTapSeekSide(500f, 1000f))
+        assertEquals(1, PlayerMath.doubleTapSeekSide(700f, 1000f))
+        assertEquals(1, PlayerMath.doubleTapSeekSide(999f, 1000f))
+        assertEquals(0, PlayerMath.doubleTapSeekSide(-1f, 1000f))
+        assertEquals(0, PlayerMath.doubleTapSeekSide(5f, 0f))
+        assertEquals(0, PlayerMath.doubleTapSeekSide(Float.NaN, 1000f))
+        assertEquals(20_000L, PlayerMath.doubleTapSeekPosition(30_000L, -1, 90_000L))
+        assertEquals(40_000L, PlayerMath.doubleTapSeekPosition(30_000L, 1, 90_000L))
+        assertEquals(0L, PlayerMath.doubleTapSeekPosition(4_000L, -1, 90_000L))
+        assertEquals(90_000L, PlayerMath.doubleTapSeekPosition(86_000L, 1, 90_000L))
+        assertEquals(10_000L, PlayerMath.doubleTapSeekPosition(0L, 1, 0L))
+        assertEquals(30_000L, PlayerMath.doubleTapSeekPosition(30_000L, 0, 90_000L))
+    }
+
     @Test fun settingsBoundaries() {
         assertEquals(.8f, PlayerMath.progressScale(0f))
         assertEquals(2.5f, PlayerMath.progressScale(5f))
