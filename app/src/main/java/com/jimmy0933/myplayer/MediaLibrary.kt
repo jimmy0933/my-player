@@ -113,6 +113,11 @@ object PlayerMath {
         }
         return null
     }
+    /** Zero keeps the controls visible; supported nonzero delays are in seconds. */
+    val progressHideDelayOptions = listOf(2, 3, 5, 10, 15, 30, 0)
+    fun progressHideDelaySeconds(value: Int): Int =
+        value.takeIf { it in progressHideDelayOptions } ?: 5
+
     fun progressScale(value: Float): Float = if (value.isFinite()) value.coerceIn(.8f, 2.5f) else 1f
     fun progressOpacity(value: Float): Float = if (value.isFinite()) value.coerceIn(.15f, 1f) else .72f
     // Explicitly control the *drawn track height*, not just the Slider touch target.
