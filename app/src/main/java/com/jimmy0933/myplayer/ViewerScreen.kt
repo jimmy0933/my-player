@@ -182,7 +182,8 @@ fun ViewerScreen(
         Box(Modifier.fillMaxSize().pointerInput(media.key, player) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
-                if (media.isVideo) showControls()
+                // Do not reveal controls on pointer down: a center tap while
+                // hidden must only wake the bar, not toggle playback on up.
                 var dx = 0f
                 var dy = 0f
                 var transformed = false
@@ -212,6 +213,7 @@ fun ViewerScreen(
                             val threshold = with(density) { 18.dp.toPx() }
                             if (media.isVideo && !transformed &&
                                 (wasSeek || (abs(dx) > threshold && abs(dx) > abs(dy) * 1.15f))) {
+                                if (!wasSeek) showControls()
                                 wasSeek = true
                                 val start = origin ?: (player?.currentPosition ?: 0L)
                                 origin = start
