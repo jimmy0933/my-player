@@ -122,6 +122,9 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     var showRepairPrompt by remember { mutableStateOf<LocalMedia?>(null) }
     var progressSize by remember { mutableFloatStateOf(PlayerMath.progressScale(prefs.getFloat("progress_size", 1f))) }
     var progressOpacity by remember { mutableFloatStateOf(PlayerMath.progressOpacity(prefs.getFloat("progress_opacity", .72f))) }
+    var progressHideDelay by remember {
+        mutableIntStateOf(PlayerMath.progressHideDelaySeconds(prefs.getInt("progress_hide_delay_seconds", 5)))
+    }
 
     LaunchedEffect(externalRequest?.requestId) {
         // Receive a new external video without navigating through the gallery.
@@ -336,6 +339,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                     onRepairMp4 = { showRepairPrompt = displayed },
                     onPlaybackSettings = { showSettings = true },
                     progressScale = progressSize, progressOpacity = progressOpacity,
+                    progressHideDelaySeconds = progressHideDelay,
                     isExternalVideo = openedExternally
                 )
             }
@@ -487,13 +491,16 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     if (showSettings) {
         PlaybackSettingsDialog(
             size = progressSize, opacity = progressOpacity,
+            hideDelaySeconds = progressHideDelay,
             canManage = Build.VERSION.SDK_INT >= 31 && MediaStore.canManageMedia(context),
             onDismiss = { showSettings = false },
-            onSave = { size, opacity ->
+            onSave = { size, opacity, delay ->
                 progressSize = PlayerMath.progressScale(size)
                 progressOpacity = PlayerMath.progressOpacity(opacity)
+                progressHideDelay = PlayerMath.progressHideDelaySeconds(delay)
                 prefs.edit().putFloat("progress_size", progressSize)
                     .putFloat("progress_opacity", progressOpacity)
+                    .putInt("progress_hide_delay_seconds", progressHideDelay)
                     .remove("progress_width").apply()
                 showSettings = false
             },
@@ -509,12 +516,14 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
 
 @Composable
 private fun PlaybackSettingsDialog(
-    size: Float, opacity: Float, canManage: Boolean,
+    size: Float, opacity: Float, hideDelaySeconds: Int, canManage: Boolean,
     onDismiss: () -> Unit,
-    onSave: (Float, Float) -> Unit,
+    onSave: (Float, Float, Int) -> Unit,
     onRequestManage: () -> Unit
 ) {
     var scale by remember(size) { mutableFloatStateOf(size) }
+    var hideDelay by remember(hideDelaySeconds) { mutableIntStateOf(hideDelaySeconds) }
+    var hideDelayMenuOpen by remember { mutableStateOf(false) }
     // The control now moves in the intuitive direction: further right means
     // more transparent. Persisted values remain opacity for compatibility.
     var transparency by remember(opacity) { mutableFloatStateOf(1f - opacity) }
@@ -524,6 +533,29 @@ private fun PlaybackSettingsDialog(
         title = { Text("播放器設定") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("進度條自動隱藏")
+                Box {
+                    OutlinedButton(onClick = { hideDelayMenuOpen = true }) {
+                        Text(if (hideDelay == 0) "永不隱藏" else "${hideDelay} 秒後隱藏")
+                    }
+                    DropdownMenu(
+                        expanded = hideDelayMenuOpen,
+                        onDismissRequest = { hideDelayMenuOpen = false }
+                    ) {
+                        PlayerMath.progressHideDelayOptions.forEach { seconds ->
+                            DropdownMenuItem(
+                                text = { Text(if (seconds == 0) "永不隱藏" else "${seconds} 秒") },
+                                onClick = {
+                                    hideDelay = seconds
+                                    hideDelayMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Text("隱藏後單點影片畫面即可重新顯示進度條。",
+                    color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(12.dp))
                 Text("進度條粗度：${PlayerMath.progressThicknessDp(scale).toInt()} dp")
                 Slider(value = scale, onValueChange = { scale = it }, valueRange = .8f..2.5f)
                 Text("進度條透明度：${(transparency * 100f).toInt()}%")
@@ -556,7 +588,11 @@ private fun PlaybackSettingsDialog(
                     color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(scale, 1f - transparency) }) { Text("儲存") } },
-        dismissButton = { TextButton(onClick = { onSave(1f, .72f) }) { Text("恢復預設") } }
+        confirmButton = {
+            TextButton(onClick = { onSave(scale, 1f - transparency, hideDelay) }) { Text("儲存") }
+        },
+        dismissButton = {
+            TextButton(onClick = { onSave(1f, .72f, 5) }) { Text("恢復預設") }
+        }
     )
 }
