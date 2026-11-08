@@ -38,6 +38,16 @@ class PlayerMathTest {
         assertEquals(30_000L, PlayerMath.doubleTapSeekPosition(30_000L, 0, 90_000L))
     }
 
+    @Test fun progressAutoHideDelayOptions() {
+        assertEquals(listOf(2, 3, 5, 10, 15, 30, 0), PlayerMath.progressHideDelayOptions)
+        assertEquals(5, PlayerMath.progressHideDelaySeconds(-1))
+        assertEquals(5, PlayerMath.progressHideDelaySeconds(999))
+        assertEquals(5, PlayerMath.progressHideDelaySeconds(5))
+        assertEquals(2, PlayerMath.progressHideDelaySeconds(2))
+        assertEquals(30, PlayerMath.progressHideDelaySeconds(30))
+        assertEquals(0, PlayerMath.progressHideDelaySeconds(0))
+    }
+
     @Test fun settingsBoundaries() {
         assertEquals(.8f, PlayerMath.progressScale(0f))
         assertEquals(2.5f, PlayerMath.progressScale(5f))
