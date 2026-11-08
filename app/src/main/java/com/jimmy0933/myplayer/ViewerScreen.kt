@@ -62,6 +62,7 @@ fun ViewerScreen(
     onPlaybackSettings: () -> Unit,
     progressScale: Float,
     progressOpacity: Float,
+    progressHideDelaySeconds: Int,
     isExternalVideo: Boolean = false
 ) {
     val context = LocalContext.current
@@ -124,13 +125,14 @@ fun ViewerScreen(
             delay(250)
         }
     }
-    LaunchedEffect(media.key, playing, interaction, previewMenuOpen) {
-        if (previewMenuOpen) {
-            controlsVisible = true
-        } else if (media.isVideo && playing) {
-            delay(2_000)
+    // Auto-hide both the top controls and the full playback timeline.
+    // Once hidden, only an explicit tap or another user interaction reveals
+    // them again. Pausing/playing does not revive a hidden timeline.
+    LaunchedEffect(media.key, progressHideDelaySeconds, controlsVisible, interaction, previewMenuOpen) {
+        if (media.isVideo && controlsVisible && !previewMenuOpen && progressHideDelaySeconds > 0) {
+            delay(progressHideDelaySeconds * 1_000L)
             controlsVisible = false
-        } else controlsVisible = true
+        }
     }
     LaunchedEffect(switchHint) {
         if (switchHint != null) {
@@ -251,7 +253,14 @@ fun ViewerScreen(
                     )
                     fun singleTap() {
                         if (media.isVideo) {
-                            if (isCentral) togglePlayback() else showControls()
+                            if (!controlsVisible) {
+                                // First tap wakes the progress bar without pausing.
+                                showControls()
+                            } else if (isCentral) {
+                                togglePlayback()
+                            } else {
+                                showControls()
+                            }
                         } else controlsVisible = !controlsVisible
                     }
                     val now = down.uptimeMillis
@@ -377,10 +386,9 @@ fun ViewerScreen(
                 }
             }
         }
-        // Keep the timeline visible while the movie is playing. Previously it
-        // disappeared with the control overlay after two seconds, making changes
-        // in playback settings appear to have no effect.
-        if (media.isVideo) {
+        // Remove the entire timeline (including its touch surface) when the
+        // configured hide delay expires. A video tap restores it on demand.
+        if (media.isVideo && controlsVisible) {
             Column(
                 Modifier.fillMaxWidth().align(Alignment.BottomCenter)
                     .then(
