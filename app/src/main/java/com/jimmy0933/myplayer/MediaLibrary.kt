@@ -114,7 +114,7 @@ object PlayerMath {
         return null
     }
     /** Zero keeps the controls visible; supported nonzero delays are in seconds. */
-    val progressHideDelayOptions = listOf(2, 3, 5, 10, 15, 30, 0)
+    val progressHideDelayOptions = listOf(1, 2, 3, 5, 10, 15, 30, 0)
     fun progressHideDelaySeconds(value: Int): Int =
         value.takeIf { it in progressHideDelayOptions } ?: 5
 
