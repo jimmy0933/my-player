@@ -39,10 +39,11 @@ class PlayerMathTest {
     }
 
     @Test fun progressAutoHideDelayOptions() {
-        assertEquals(listOf(2, 3, 5, 10, 15, 30, 0), PlayerMath.progressHideDelayOptions)
+        assertEquals(listOf(1, 2, 3, 5, 10, 15, 30, 0), PlayerMath.progressHideDelayOptions)
         assertEquals(5, PlayerMath.progressHideDelaySeconds(-1))
         assertEquals(5, PlayerMath.progressHideDelaySeconds(999))
         assertEquals(5, PlayerMath.progressHideDelaySeconds(5))
+        assertEquals(1, PlayerMath.progressHideDelaySeconds(1))
         assertEquals(2, PlayerMath.progressHideDelaySeconds(2))
         assertEquals(30, PlayerMath.progressHideDelaySeconds(30))
         assertEquals(0, PlayerMath.progressHideDelaySeconds(0))
