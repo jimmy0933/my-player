@@ -106,6 +106,7 @@ jobs:
           grep -Fq 'progressHideDelaySeconds = progressHideDelay' "$MAIN"
           grep -Fq 'progress_hide_delay_seconds' "$MAIN"
           grep -Fq 'fun progressHideDelaySeconds(' "$MATH"
+          grep -Fq 'listOf(1, 2, 3, 5, 10, 15, 30, 0)' "$MATH"
           grep -Fq 'progressAutoHideDelayOptions' "$TEST"
           grep -Fq 'delay(progressHideDelaySeconds * 1_000L)' "$VIEWER"
           grep -Fq 'if (media.isVideo && controlsVisible)' "$VIEWER"
@@ -160,10 +161,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.14-signed.apk
+            NAME=MyPlayer-v1.1.15-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.14-debug-signed.apk
+            NAME=MyPlayer-v1.1.15-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -179,12 +180,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.14"
+          TAG="v1.1.15"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.14 · configurable progress auto-hide
+          # My Player v1.1.15 · configurable progress auto-hide
 
           Playback settings now let you choose progress bar visibility for
-          2, 3, 5 (default), 10, 15 or 30 seconds, or never hide.
+          1, 2, 3, 5 (default), 10, 15 or 30 seconds, or never hide.
           After the interval, the complete timeline and top overlay disappear
           until you tap the video. The first tap when hidden restores controls
           without pausing playback; a further center tap toggles playback.
@@ -261,9 +262,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.14 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.15 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.14 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.15 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
