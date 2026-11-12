@@ -39,7 +39,9 @@ import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
 object UiColors {
@@ -136,6 +138,8 @@ fun GalleryScreen(
             val savedIndex = if (savedHere) prefs.getInt("gallery_scroll_index", 0) else 0
             val savedOffset = if (savedHere) prefs.getInt("gallery_scroll_offset", 0) else 0
             if (itemCount > 0) {
+                // Avoid clamping back to zero before the initial LazyGrid layout.
+                snapshotFlow { gridState.layoutInfo.totalItemsCount }.first { it > 0 }
                 gridState.scrollToItem(savedIndex.coerceIn(0, itemCount - 1),
                     savedOffset.coerceAtLeast(0))
             } else {
@@ -149,7 +153,9 @@ fun GalleryScreen(
         if (!loading && restoredScrollContext == scrollContext) {
             snapshotFlow {
                 gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
-            }.collect { (index, offset) ->
+            }.collectLatest { (index, offset) ->
+                // Debounce scrolling so a fast fling does not write preferences every frame.
+                delay(180)
                 prefs.edit().putString("gallery_scroll_key", scrollContext)
                     .putInt("gallery_scroll_index", index)
                     .putInt("gallery_scroll_offset", offset).apply()
