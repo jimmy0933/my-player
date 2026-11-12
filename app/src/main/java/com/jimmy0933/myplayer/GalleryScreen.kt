@@ -472,8 +472,12 @@ fun GalleryScreen(
                                     selectionMode = selectionMode,
                                     checked = entry.key in selected,
                                     favorite = entry.key in favorites,
+                                    hasBeenPlayed = entry.key in playedVideos,
                                     onClick = {
-                                        if (selectionMode) onSelect(entry) else onOpen(entry)
+                                        if (selectionMode) onSelect(entry) else {
+                                            saveScrollPosition()
+                                            onOpen(entry)
+                                        }
                                     },
                                     onLongPress = { onSelect(entry) },
                                     onSelect = { onSelect(entry) }
@@ -502,8 +506,12 @@ fun GalleryScreen(
                                     selectionMode = selectionMode,
                                     checked = entry.key in selected,
                                     favorite = entry.key in favorites,
+                                    hasBeenPlayed = entry.key in playedVideos,
                                     onClick = {
-                                        if (selectionMode) onSelect(entry) else onOpen(entry)
+                                        if (selectionMode) onSelect(entry) else {
+                                            saveScrollPosition()
+                                            onOpen(entry)
+                                        }
                                     },
                                     onLongPress = { onSelect(entry) },
                                     onSelect = { onSelect(entry) }
@@ -553,6 +561,7 @@ private fun MediaTile(
     selectionMode: Boolean,
     checked: Boolean,
     favorite: Boolean,
+    hasBeenPlayed: Boolean,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
     onSelect: () -> Unit
@@ -594,6 +603,29 @@ private fun MediaTile(
                     modifier = Modifier.align(Alignment.TopEnd)
                         .padding(5.dp).size(15.dp)
                 )
+            }
+            if (entry.isVideo && !hasBeenPlayed) {
+                // A subtle animated glint marks videos never actually played.
+                val pulse by rememberInfiniteTransition(label = "unplayed").animateFloat(
+                    initialValue = .45f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1_150), repeatMode = RepeatMode.Reverse
+                    ), label = "glint"
+                )
+                Row(
+                    Modifier.align(Alignment.BottomStart).padding(4.dp)
+                        .background(UiColors.Mint.copy(alpha = .94f), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color.White.copy(alpha = pulse),
+                            RoundedCornerShape(6.dp))
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.AutoAwesome, "尚未播放",
+                        modifier = Modifier.size(11.dp), tint = UiColors.Background)
+                    Spacer(Modifier.width(3.dp))
+                    Text("未看", color = UiColors.Background, fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold)
+                }
             }
             if (entry.isVideo) {
                 // Only the duration in the bottom-right corner. No size badge
