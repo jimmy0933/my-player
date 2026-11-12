@@ -118,6 +118,14 @@ object PlayerMath {
     fun progressHideDelaySeconds(value: Int): Int =
         value.takeIf { it in progressHideDelayOptions } ?: 5
 
+    /** Resume near the last position, but restart videos already at their ending. */
+    fun resumePosition(positionMs: Long, durationMs: Long): Long {
+        val position = positionMs.coerceAtLeast(0L)
+        if (durationMs <= 0L) return position
+        val endMargin = minOf(3_000L, (durationMs / 20L).coerceAtLeast(500L))
+        return if (position >= durationMs - endMargin) 0L else position
+    }
+
     fun progressScale(value: Float): Float = if (value.isFinite()) value.coerceIn(.8f, 2.5f) else 1f
     fun progressOpacity(value: Float): Float = if (value.isFinite()) value.coerceIn(.15f, 1f) else .72f
     // Explicitly control the *drawn track height*, not just the Slider touch target.
