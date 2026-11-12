@@ -57,8 +57,10 @@ fun ViewerScreen(
     media: LocalMedia,
     onBack: () -> Unit,
     onChange: (Int) -> Boolean,
-    onDelete: () -> Unit,
     onRepairMp4: () -> Unit,
+    resumePositionMs: Long,
+    onVideoStarted: () -> Unit,
+    onPlaybackProgress: (Long, Long) -> Unit,
     onPlaybackSettings: () -> Unit,
     progressScale: Float,
     progressOpacity: Float,
@@ -77,14 +79,33 @@ fun ViewerScreen(
     DisposableEffect(player, media.key) {
         player?.apply {
             setMediaItem(MediaItem.fromUri(media.uri))
+            val positionToResume = PlayerMath.resumePosition(resumePositionMs, media.durationMs)
+            if (positionToResume > 0L) seekTo(positionToResume)
             prepare()
             playWhenReady = true
         }
-        onDispose { player?.release() }
+        onDispose {
+            if (player != null && player.playbackState != Player.STATE_IDLE) {
+                val durationMs = player.duration.takeIf { it > 0L } ?: media.durationMs
+                val savedPosition = if (player.playbackState == Player.STATE_ENDED) 0L
+                    else player.currentPosition.coerceAtLeast(0L)
+                onPlaybackProgress(savedPosition, durationMs)
+            }
+            player?.release()
+        }
     }
     DisposableEffect(player, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) player?.pause()
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                if (player != null && player.playbackState != Player.STATE_IDLE) {
+                    val durationMs = player.duration.takeIf { it > 0L } ?: media.durationMs
+                    onPlaybackProgress(
+                        if (player.playbackState == Player.STATE_ENDED) 0L else player.currentPosition,
+                        durationMs
+                    )
+                }
+                player?.pause()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -118,10 +139,27 @@ fun ViewerScreen(
     DisposableEffect(media.key) {
         onDispose { pendingTap?.cancel() }
     }
-    LaunchedEffect(player) {
+    var hasReportedPlayback by remember(media.key) { mutableStateOf(false) }
+    LaunchedEffect(player, media.key) {
+        var lastSavedPosition = -1L
         while (isActive && player != null) {
             currentMs = player.currentPosition.coerceAtLeast(0L)
             playing = player.isPlaying
+            if (playing && !hasReportedPlayback) {
+                hasReportedPlayback = true
+                onVideoStarted()
+            }
+            if (player.playbackState == Player.STATE_READY ||
+                player.playbackState == Player.STATE_ENDED) {
+                val length = player.duration.takeIf { it > 0L } ?: media.durationMs
+                val positionToSave = if (player.playbackState == Player.STATE_ENDED) 0L
+                    else currentMs
+                if (lastSavedPosition < 0L ||
+                    kotlin.math.abs(positionToSave - lastSavedPosition) >= 1_500L) {
+                    onPlaybackProgress(positionToSave, length)
+                    lastSavedPosition = positionToSave
+                }
+            }
             delay(250)
         }
     }
@@ -376,14 +414,6 @@ fun ViewerScreen(
                                 }
                             )
                         }
-                        if (!isExternalVideo) DropdownMenuItem(
-                            text = { Text("刪除目前檔案", color = Color(0xFFFFA4A9)) },
-                            onClick = {
-                                previewMenuOpen = false
-                                player?.pause()
-                                onDelete()
-                            }
-                        )
                     }
                 }
             }
