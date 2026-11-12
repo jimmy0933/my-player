@@ -179,12 +179,10 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
         }
         loading = false
     }
-    LaunchedEffect(viewerItems != null) {
-        activity.requestedOrientation =
-            if (viewerItems != null) ActivityInfo.SCREEN_ORIENTATION_SENSOR
-            else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-    }
-    DisposableEffect(Unit) {
+    // Both the gallery and viewer can follow the device's orientation.
+    // Keep the same Activity and media state when the screen rotates.
+    DisposableEffect(activity) {
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
         onDispose { activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
     val visible = remember(gallery, typeFilter, browserMode, folder, search, sort, favorites) {
