@@ -49,6 +49,13 @@ class PlayerMathTest {
         assertEquals(0, PlayerMath.progressHideDelaySeconds(0))
     }
 
+    @Test fun lastPlayedHoverOnlyHighlightsLatestVideo() {
+        assertTrue(PlayerMath.isLastPlayedVideo("video:two", true, "video:two"))
+        assertFalse(PlayerMath.isLastPlayedVideo("video:one", true, "video:two"))
+        assertFalse(PlayerMath.isLastPlayedVideo("video:two", false, "video:two"))
+        assertFalse(PlayerMath.isLastPlayedVideo("video:two", true, null))
+    }
+
     @Test fun playbackResumeAndCompletedVideoRestart() {
         assertEquals(45_000L, PlayerMath.resumePosition(45_000L, 120_000L))
         assertEquals(0L, PlayerMath.resumePosition(118_000L, 120_000L))
