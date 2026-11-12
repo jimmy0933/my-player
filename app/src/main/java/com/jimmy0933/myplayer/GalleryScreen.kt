@@ -1,10 +1,5 @@
 package com.jimmy0933.myplayer
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -25,7 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.border
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -611,26 +606,24 @@ private fun MediaTile(
                 )
             }
             if (entry.isVideo && !hasBeenPlayed) {
-                // A subtle animated glint marks videos never actually played.
-                val pulse by rememberInfiniteTransition(label = "unplayed").animateFloat(
-                    initialValue = .45f, targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1_150), repeatMode = RepeatMode.Reverse
-                    ), label = "glint"
-                )
-                Row(
-                    Modifier.align(Alignment.BottomStart).padding(4.dp)
-                        .background(UiColors.Mint.copy(alpha = .94f), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color.White.copy(alpha = pulse),
-                            RoundedCornerShape(6.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Slim, translucent ribbon tucked into the thumbnail's top-left corner.
+                // Static styling avoids distracting from the actual video preview.
+                Box(
+                    Modifier.align(Alignment.TopStart)
+                        .offset(x = (-15).dp, y = 13.dp)
+                        .width(65.dp)
+                        .height(16.dp)
+                        .rotate(-38f)
+                        .background(Color(0xFFC7EFE6).copy(alpha = .72f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.AutoAwesome, "尚未播放",
-                        modifier = Modifier.size(11.dp), tint = UiColors.Background)
-                    Spacer(Modifier.width(3.dp))
-                    Text("未看", color = UiColors.Background, fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold)
+                    Text(
+                        "未看",
+                        color = Color(0xFF254744).copy(alpha = .85f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
                 }
             }
             if (entry.isVideo) {
