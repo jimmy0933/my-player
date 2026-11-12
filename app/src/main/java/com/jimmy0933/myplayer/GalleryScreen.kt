@@ -1,5 +1,10 @@
 package com.jimmy0933.myplayer
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -20,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -33,6 +39,7 @@ import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import kotlin.math.roundToInt
 
 object UiColors {
@@ -61,6 +68,9 @@ fun GalleryScreen(
     selected: Set<String>,
     favorites: Set<String>,
     favoriteFolders: Set<String>,
+    playedVideos: Set<String>,
+    focusOnReturnKey: String?,
+    onReturnFocusHandled: () -> Unit,
     onRequestPermission: () -> Unit,
     onRefresh: () -> Unit,
     onMode: (String) -> Unit,
@@ -80,6 +90,9 @@ fun GalleryScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(search.isNotBlank()) }
     val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences("my_player_preferences", android.content.Context.MODE_PRIVATE)
+    }
     // One shared decoder/cache for the gallery instead of one ImageLoader per tile.
     val galleryLoader = remember(context) {
         ImageLoader.Builder(context).components { add(VideoFrameDecoder.Factory()) }.build()
@@ -100,8 +113,62 @@ fun GalleryScreen(
         else -> typeFilter
     }
     val gridState = rememberLazyGridState()
-    LaunchedEffect(browserMode, typeFilter, folder, sort, listMode) {
-        gridState.scrollToItem(0)
+    // Save the browsing context alongside the exact first visible item/offset.
+    // GalleryScreen is temporarily disposed while the fullscreen player is shown.
+    val scrollContext = remember(browserMode, typeFilter, folder, sort, listMode, search) {
+        listOf(browserMode, typeFilter, folder, sort, listMode.toString(), search)
+            .joinToString("|")
+    }
+    var restoredScrollContext by remember { mutableStateOf<String?>(null) }
+    val itemCount = visibleMedia.size +
+        if (browserMode == "資料夾") childFolders.size else 0
+
+    fun saveScrollPosition() {
+        prefs.edit().putString("gallery_scroll_key", scrollContext)
+            .putInt("gallery_scroll_index", gridState.firstVisibleItemIndex)
+            .putInt("gallery_scroll_offset", gridState.firstVisibleItemScrollOffset)
+            .apply()
+    }
+
+    LaunchedEffect(scrollContext, loading, itemCount) {
+        if (!loading && restoredScrollContext != scrollContext) {
+            val savedHere = prefs.getString("gallery_scroll_key", null) == scrollContext
+            val savedIndex = if (savedHere) prefs.getInt("gallery_scroll_index", 0) else 0
+            val savedOffset = if (savedHere) prefs.getInt("gallery_scroll_offset", 0) else 0
+            if (itemCount > 0) {
+                gridState.scrollToItem(savedIndex.coerceIn(0, itemCount - 1),
+                    savedOffset.coerceAtLeast(0))
+            } else {
+                gridState.scrollToItem(0)
+            }
+            restoredScrollContext = scrollContext
+            saveScrollPosition()
+        }
+    }
+    LaunchedEffect(scrollContext, restoredScrollContext, loading) {
+        if (!loading && restoredScrollContext == scrollContext) {
+            snapshotFlow {
+                gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+            }.collect { (index, offset) ->
+                prefs.edit().putString("gallery_scroll_key", scrollContext)
+                    .putInt("gallery_scroll_index", index)
+                    .putInt("gallery_scroll_offset", offset).apply()
+            }
+        }
+    }
+    LaunchedEffect(focusOnReturnKey, restoredScrollContext, loading, visibleMedia, childFolders) {
+        if (!loading && focusOnReturnKey != null && restoredScrollContext == scrollContext) {
+            val mediaIndex = visibleMedia.indexOfFirst { it.key == focusOnReturnKey }
+            if (mediaIndex >= 0) {
+                val gridIndex = mediaIndex +
+                    if (browserMode == "資料夾") childFolders.size else 0
+                if (gridState.layoutInfo.visibleItemsInfo.none { it.index == gridIndex }) {
+                    gridState.scrollToItem(gridIndex)
+                }
+                saveScrollPosition()
+            }
+            onReturnFocusHandled()
+        }
     }
     LaunchedEffect(notice) {
         if (notice.isNotBlank() && !notice.startsWith("本機離線播放")) {
@@ -135,6 +202,10 @@ fun GalleryScreen(
                 color = if (selectionMode) UiColors.Mint else Color.White
             )
             if (selectionMode) {
+                IconButton(onClick = { onFileAction("刪除") }) {
+                    Icon(Icons.Default.DeleteOutline, "刪除已選影片或照片",
+                        tint = Color(0xFFFFA4A9))
+                }
                 IconButton(onClick = onClearSelection) {
                     Icon(Icons.Default.Close, "退出多選", tint = UiColors.Subtle)
                 }
@@ -168,11 +239,6 @@ fun GalleryScreen(
                             text = { Text(if (allFavorited) "取消選取的收藏" else "收藏選取項目") },
                             leadingIcon = { Icon(Icons.Default.FavoriteBorder, null) },
                             onClick = { menuOpen = false; onFavoriteSelection() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("刪除選取（${selected.size}）", color = Color(0xFFFFA4A9)) },
-                            leadingIcon = { Icon(Icons.Default.DeleteOutline, null, tint = Color(0xFFFFA4A9)) },
-                            onClick = { menuOpen = false; onFileAction("刪除") }
                         )
                         DropdownMenuItem(
                             text = { Text("取消選取") },
