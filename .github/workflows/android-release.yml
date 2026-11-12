@@ -108,6 +108,17 @@ jobs:
           grep -Fq 'fun progressHideDelaySeconds(' "$MATH"
           grep -Fq 'listOf(1, 2, 3, 5, 10, 15, 30, 0)' "$MATH"
           grep -Fq 'progressAutoHideDelayOptions' "$TEST"
+          grep -Fq 'fun resumePosition(' "$MATH"
+          grep -Fq 'playbackResumeAndCompletedVideoRestart' "$TEST"
+          grep -Fq 'resumePositionMs = prefs.getLong(' "$MAIN"
+          grep -Fq 'gallery_scroll_index' "$GALLERY"
+          grep -Fq 'onReturnFocusHandled()' "$GALLERY"
+          grep -Fq 'hasBeenPlayed = entry.key in playedVideos' "$GALLERY"
+          grep -Fq 'onVideoStarted()' "$VIEWER"
+          if grep -Fq '刪除目前檔案' "$VIEWER"; then
+            echo "ERROR: Delete must live in the gallery toolbar"
+            exit 1
+          fi
           grep -Fq 'delay(progressHideDelaySeconds * 1_000L)' "$VIEWER"
           grep -Fq 'if (media.isVideo && controlsVisible)' "$VIEWER"
           grep -Fq 'if (!controlsVisible)' "$VIEWER"
@@ -161,10 +172,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.15-signed.apk
+            NAME=MyPlayer-v1.1.16-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.15-debug-signed.apk
+            NAME=MyPlayer-v1.1.16-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -180,16 +191,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.15"
+          TAG="v1.1.16"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.15 · configurable progress auto-hide
+          # My Player v1.1.16 · resume gallery, keep playback, mark unseen
 
-          Playback settings now let you choose progress bar visibility for
-          1, 2, 3, 5 (default), 10, 15 or 30 seconds, or never hide.
-          After the interval, the complete timeline and top overlay disappear
-          until you tap the video. The first tap when hidden restores controls
-          without pausing playback; a further center tap toggles playback.
-          Settings persist across restarts, including external video launches.
+          Returning from a video preserves the gallery scroll position and
+          shows the last viewed item, even after swiping between videos.
+          Opening the app again restores the last visited tab, folder and
+          precise list/grid scroll offset. Playback resumes from its last
+          saved position; videos watched to the end restart from the start.
+          Unwatched videos show a soft animated mint badge which disappears
+          after actual playback begins. Select videos by long pressing, then
+          use the delete button in the gallery top bar. The fullscreen
+          viewer no longer includes a delete button.
+
+          Progress bar auto-hide remains configurable at 1, 2, 3, 5
+          (default), 10, 15 or 30 seconds, or never hide. The first
+          tap when hidden restores controls without pausing playback.
           Edge double-tap seeking and vertical media transitions are preserved.
 
           Removed the large +10/-10 second text overlays while double
@@ -262,9 +280,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.15 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.16 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.15 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.16 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
