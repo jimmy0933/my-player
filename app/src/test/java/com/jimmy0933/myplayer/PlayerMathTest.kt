@@ -49,6 +49,14 @@ class PlayerMathTest {
         assertEquals(0, PlayerMath.progressHideDelaySeconds(0))
     }
 
+    @Test fun playbackResumeAndCompletedVideoRestart() {
+        assertEquals(45_000L, PlayerMath.resumePosition(45_000L, 120_000L))
+        assertEquals(0L, PlayerMath.resumePosition(118_000L, 120_000L))
+        assertEquals(0L, PlayerMath.resumePosition(120_000L, 120_000L))
+        assertEquals(0L, PlayerMath.resumePosition(-100L, 120_000L))
+        assertEquals(5_000L, PlayerMath.resumePosition(5_000L, 0L))
+    }
+
     @Test fun settingsBoundaries() {
         assertEquals(.8f, PlayerMath.progressScale(0f))
         assertEquals(2.5f, PlayerMath.progressScale(5f))
