@@ -88,11 +88,12 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     var refreshing by remember { mutableIntStateOf(0) }
     var permissionAsked by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("本機離線播放 · 影片與照片不會上傳") }
-    var typeFilter by remember { mutableStateOf("全部") }
-    // Always start at the indexed-media storage root, not the last opened
-    // subfolder. Users can still change to All/Videos/Photos/Favorites tabs.
-    var browserMode by remember { mutableStateOf("資料夾") }
-    var folder by remember { mutableStateOf("") }
+    // Restore the previously browsed tab and folder on the next app launch.
+    var typeFilter by remember { mutableStateOf(prefs.getString("gallery_type", "全部") ?: "全部") }
+    var browserMode by remember { mutableStateOf(prefs.getString("gallery_mode", "資料夾") ?: "資料夾") }
+    var folder by remember { mutableStateOf(
+        FolderNavigation.normalize(prefs.getString("gallery_folder", "") ?: "")
+    ) }
     var search by remember { mutableStateOf(prefs.getString("search", "") ?: "") }
     var sort by remember { mutableStateOf(prefs.getString("sort", "最新") ?: "最新") }
     var listMode by remember { mutableStateOf(prefs.getBoolean("list", false)) }
@@ -106,6 +107,10 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     }
     var openedExternally by remember { mutableStateOf(externalRequest != null) }
     var viewerIndex by remember { mutableIntStateOf(0) }
+    var focusOnReturn by remember { mutableStateOf<String?>(null) }
+    var playedVideos by remember {
+        mutableStateOf(prefs.getStringSet("played_video_keys", emptySet())?.toSet() ?: emptySet())
+    }
     var showSettings by remember { mutableStateOf(false) }
     var showFolderPicker by remember { mutableStateOf(false) }
     var operation by remember { mutableStateOf("複製") }
@@ -135,7 +140,11 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
         }
     }
     fun closeViewer() {
-        if (openedExternally) activity.finish() else viewerItems = null
+        if (openedExternally) activity.finish() else {
+            // Return to the actual last video, including after up/down video swipes.
+            focusOnReturn = viewerItems?.getOrNull(viewerIndex)?.key
+            viewerItems = null
+        }
     }
     fun refresh() { refreshing++ }
     fun persistFavorites(value: Set<String>) {
@@ -295,6 +304,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     BackHandler(inViewer != null) { closeViewer() }
     BackHandler(inViewer == null && browserMode == "資料夾" && folder.isNotBlank()) {
         folder = FolderNavigation.parent(folder)
+        prefs.edit().putString("gallery_folder", folder).apply()
         selected = emptySet()
     }
     if (inViewer != null) {
@@ -335,8 +345,21 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                             } else false
                         }
                     },
-                    onDelete = { requestDelete(listOf(displayed)) },
                     onRepairMp4 = { showRepairPrompt = displayed },
+                    resumePositionMs = prefs.getLong("resume_position_${displayed.key}", 0L),
+                    onVideoStarted = {
+                        if (displayed.key !in playedVideos) {
+                            val updated = playedVideos + displayed.key
+                            playedVideos = updated
+                            prefs.edit().putStringSet("played_video_keys", updated).apply()
+                        }
+                    },
+                    onPlaybackProgress = { positionMs, durationMs ->
+                        prefs.edit().putLong(
+                            "resume_position_${displayed.key}",
+                            PlayerMath.resumePosition(positionMs, durationMs)
+                        ).apply()
+                    },
                     onPlaybackSettings = { showSettings = true },
                     progressScale = progressSize, progressOpacity = progressOpacity,
                     progressHideDelaySeconds = progressHideDelay,
@@ -351,17 +374,24 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
             notice = notice, browserMode = browserMode, typeFilter = typeFilter,
             folder = folder, search = search, sort = sort, listMode = listMode,
             selected = selected, favorites = favorites,
-            favoriteFolders = favoriteFolders,
+            favoriteFolders = favoriteFolders, playedVideos = playedVideos,
+            focusOnReturnKey = focusOnReturn,
+            onReturnFocusHandled = { focusOnReturn = null },
             onRequestPermission = { permissionsLauncher.launch(requiredPermissions()) },
             onRefresh = { refresh() },
             onMode = {
                 browserMode = it
-                // Entering folder browsing always starts from its root.
                 folder = ""
+                prefs.edit().putString("gallery_mode", it)
+                    .putString("gallery_folder", "").apply()
             },
-            onType = { typeFilter = it },
+            onType = {
+                typeFilter = it
+                prefs.edit().putString("gallery_type", it).apply()
+            },
             onFolder = {
                 folder = FolderNavigation.normalize(it)
+                prefs.edit().putString("gallery_folder", folder).apply()
                 selected = emptySet()
             },
             onFavoriteFolder = { key ->
