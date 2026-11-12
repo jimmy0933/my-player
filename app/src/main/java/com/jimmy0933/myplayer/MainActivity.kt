@@ -107,7 +107,10 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     }
     var openedExternally by remember { mutableStateOf(externalRequest != null) }
     var viewerIndex by remember { mutableIntStateOf(0) }
-    var focusOnReturn by remember { mutableStateOf<String?>(null) }
+    // Pending focus also survives the process being stopped during playback.
+    var focusOnReturn by remember {
+        mutableStateOf(prefs.getString("pending_gallery_focus_key", null))
+    }
     var playedVideos by remember {
         mutableStateOf(prefs.getStringSet("played_video_keys", emptySet())?.toSet() ?: emptySet())
     }
@@ -143,6 +146,9 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
         if (openedExternally) activity.finish() else {
             // Return to the actual last video, including after up/down video swipes.
             focusOnReturn = viewerItems?.getOrNull(viewerIndex)?.key
+            focusOnReturn?.let {
+                prefs.edit().putString("pending_gallery_focus_key", it).apply()
+            }
             viewerItems = null
         }
     }
@@ -348,6 +354,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                             val next = (viewerIndex + step).coerceIn(0, viewing.lastIndex)
                             if (next != viewerIndex) {
                                 viewerIndex = next
+                                prefs.edit().putString("pending_gallery_focus_key", viewing[next].key).apply()
                                 true
                             } else false
                         }
@@ -383,7 +390,10 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
             selected = selected, favorites = favorites,
             favoriteFolders = favoriteFolders, playedVideos = playedVideos,
             focusOnReturnKey = focusOnReturn,
-            onReturnFocusHandled = { focusOnReturn = null },
+            onReturnFocusHandled = {
+                focusOnReturn = null
+                prefs.edit().remove("pending_gallery_focus_key").apply()
+            },
             onRequestPermission = { permissionsLauncher.launch(requiredPermissions()) },
             onRefresh = { refresh() },
             onMode = {
@@ -409,6 +419,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
             onSort = { sort = it; prefs.edit().putString("sort", it).apply() },
             onListMode = { listMode = !listMode; prefs.edit().putBoolean("list", listMode).apply() },
             onOpen = { entry ->
+                prefs.edit().putString("pending_gallery_focus_key", entry.key).apply()
                 viewerItems = visible
                 viewerIndex = visible.indexOfFirst { it.key == entry.key }.coerceAtLeast(0)
             },
