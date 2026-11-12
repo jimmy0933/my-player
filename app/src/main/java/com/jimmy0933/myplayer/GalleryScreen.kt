@@ -20,11 +20,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,6 +108,14 @@ fun GalleryScreen(
         "資料夾" -> "資料夾"
         "收藏" -> "收藏"
         else -> typeFilter
+    }
+    val isLandscape = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    // Use the extra width in landscape without forcing the user back to portrait.
+    val gridColumns = if (listMode) {
+        if (isLandscape) 2 else 1
+    } else {
+        if (isLandscape) 5 else 3
     }
     val gridState = rememberLazyGridState()
     // Save the browsing context alongside the exact first visible item/offset.
@@ -397,7 +405,7 @@ fun GalleryScreen(
                         // direct media in the current folder. Folder rows always
                         // span the full grid width, including three-column mode.
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(if (listMode) 1 else 3),
+                            columns = GridCells.Fixed(gridColumns),
                             state = gridState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
@@ -492,7 +500,7 @@ fun GalleryScreen(
                 else -> {
                     Box(Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(if (listMode) 1 else 3),
+                            columns = GridCells.Fixed(gridColumns),
                             state = gridState,
                             modifier = Modifier.fillMaxSize().padding(end = 18.dp),
                             contentPadding = PaddingValues(
@@ -605,26 +613,17 @@ private fun MediaTile(
                         .padding(5.dp).size(15.dp)
                 )
             }
-            if (entry.isVideo && !hasBeenPlayed) {
-                // Slim, translucent ribbon tucked into the thumbnail's top-left corner.
-                // Static styling avoids distracting from the actual video preview.
-                Box(
-                    Modifier.align(Alignment.TopStart)
-                        .offset(x = (-15).dp, y = 13.dp)
-                        .width(65.dp)
-                        .height(16.dp)
-                        .rotate(-38f)
-                        .background(Color(0xFFC7EFE6).copy(alpha = .72f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "未看",
-                        color = Color(0xFF254744).copy(alpha = .85f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1
-                    )
-                }
+            if (entry.isVideo && !hasBeenPlayed && !selectionMode) {
+                // Minimal red N in the corner. No ribbon, background or animation.
+                Text(
+                    "N",
+                    modifier = Modifier.align(Alignment.TopStart)
+                        .padding(start = 6.dp, top = 3.dp),
+                    color = Color(0xFFE95C66),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
             }
             if (entry.isVideo) {
                 // Only the duration in the bottom-right corner. No size badge
