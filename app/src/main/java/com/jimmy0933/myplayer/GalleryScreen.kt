@@ -1,5 +1,7 @@
 package com.jimmy0933.myplayer
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -20,11 +22,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,6 +72,7 @@ fun GalleryScreen(
     favorites: Set<String>,
     favoriteFolders: Set<String>,
     playedVideos: Set<String>,
+    lastPlayedVideoKey: String?,
     focusOnReturnKey: String?,
     onReturnFocusHandled: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -482,6 +489,9 @@ fun GalleryScreen(
                                     checked = entry.key in selected,
                                     favorite = entry.key in favorites,
                                     hasBeenPlayed = entry.key in playedVideos,
+                                    isLastPlayed = PlayerMath.isLastPlayedVideo(
+                                        entry.key, entry.isVideo, lastPlayedVideoKey
+                                    ),
                                     onClick = {
                                         if (selectionMode) onSelect(entry) else {
                                             saveScrollPosition()
@@ -516,6 +526,9 @@ fun GalleryScreen(
                                     checked = entry.key in selected,
                                     favorite = entry.key in favorites,
                                     hasBeenPlayed = entry.key in playedVideos,
+                                    isLastPlayed = PlayerMath.isLastPlayedVideo(
+                                        entry.key, entry.isVideo, lastPlayedVideoKey
+                                    ),
                                     onClick = {
                                         if (selectionMode) onSelect(entry) else {
                                             saveScrollPosition()
@@ -571,11 +584,36 @@ private fun MediaTile(
     checked: Boolean,
     favorite: Boolean,
     hasBeenPlayed: Boolean,
+    isLastPlayed: Boolean,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
     onSelect: () -> Unit
 ) {
     val context = LocalContext.current
+    // One quiet hover-like focus on the most recently played video.
+    // Fade in once when it appears; do not blink continuously or cover the thumbnail.
+    var focused by remember(entry.key) { mutableStateOf(false) }
+    LaunchedEffect(isLastPlayed, selectionMode) {
+        focused = isLastPlayed && !selectionMode
+    }
+    val focusAlpha by animateFloatAsState(
+        targetValue = if (focused) .78f else 0f,
+        animationSpec = tween(durationMillis = 420),
+        label = "last-played-hover"
+    )
+    val hoverShape = RoundedCornerShape(if (listMode) 11.dp else 9.dp)
+    val hoverLift = Modifier.graphicsLayer {
+        translationY = -1.5.dp.toPx() * (focusAlpha / .78f)
+        shadowElevation = 7.dp.toPx() * (focusAlpha / .78f)
+        shape = hoverShape
+        clip = false
+    }
+    val hoverOutline = Modifier.border(
+        1.5.dp, UiColors.Lavender.copy(alpha = focusAlpha), hoverShape
+    )
+    val hoverA11y = if (isLastPlayed) {
+        Modifier.semantics { stateDescription = "最後播放的影片" }
+    } else Modifier
     val picture: @Composable () -> Unit = {
         Box(
             Modifier.then(if (listMode) Modifier.size(96.dp) else Modifier.fillMaxSize())
@@ -643,8 +681,12 @@ private fun MediaTile(
     }
     if (listMode) {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
+            Modifier.fillMaxWidth()
+                .then(hoverLift)
+                .clip(RoundedCornerShape(11.dp))
                 .background(UiColors.Panel)
+                .then(hoverOutline)
+                .then(hoverA11y)
                 .combinedClickable(onClick = onClick, onLongClick = onLongPress)
                 .padding(5.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -667,7 +709,10 @@ private fun MediaTile(
     } else {
         Box(
             Modifier.fillMaxWidth().aspectRatio(.95f)
+                .then(hoverLift)
                 .clip(RoundedCornerShape(9.dp))
+                .then(hoverOutline)
+                .then(hoverA11y)
                 .combinedClickable(onClick = onClick, onLongClick = onLongPress)
         ) {
             picture()
