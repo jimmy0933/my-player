@@ -126,6 +126,13 @@ jobs:
             echo "ERROR: Old animated ribbon is still present"
             exit 1
           fi
+          grep -Fq 'last_played_video_key' "$MAIN"
+          grep -Fq 'lastPlayedVideoKey = lastPlayedVideoKey' "$MAIN"
+          grep -Fq 'lastPlayedHoverOnlyHighlightsLatestVideo' "$TEST"
+          grep -Fq 'fun isLastPlayedVideo(' "$MATH"
+          grep -Fq 'isLastPlayed = PlayerMath.isLastPlayedVideo(' "$GALLERY"
+          grep -Fq 'label = "last-played-hover"' "$GALLERY"
+          grep -Fq 'stateDescription = "最後播放的影片"' "$GALLERY"
           grep -Fq 'onVideoStarted()' "$VIEWER"
           if grep -Fq '刪除目前檔案' "$VIEWER"; then
             echo "ERROR: Delete must live in the gallery toolbar"
