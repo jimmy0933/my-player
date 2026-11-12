@@ -221,8 +221,15 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                 val confirmedDeleted = justRequested.filter { it.key !in surviving }
                 gallery = current
                 selected = selected - confirmedDeleted.map { it.key }.toSet()
-                persistFavorites(favorites - confirmedDeleted.map { it.key }.toSet())
-                viewerItems = viewerItems?.filter { it.key !in confirmedDeleted.map { x -> x.key }.toSet() }
+                val deletedKeys = confirmedDeleted.map { it.key }.toSet()
+                persistFavorites(favorites - deletedKeys)
+                if (deletedKeys.isNotEmpty()) {
+                    playedVideos = playedVideos - deletedKeys
+                    val historyEditor = prefs.edit().putStringSet("played_video_keys", playedVideos)
+                    deletedKeys.forEach { historyEditor.remove("resume_position_${it}") }
+                    historyEditor.apply()
+                }
+                viewerItems = viewerItems?.filter { it.key !in deletedKeys }
                     ?.takeIf { it.isNotEmpty() }
                 viewerIndex = viewerIndex.coerceIn(0, (viewerItems?.size ?: 1) - 1)
                 val failed = justRequested.size - confirmedDeleted.size
