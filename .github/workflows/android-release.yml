@@ -114,6 +114,12 @@ jobs:
           grep -Fq 'gallery_scroll_index' "$GALLERY"
           grep -Fq 'onReturnFocusHandled()' "$GALLERY"
           grep -Fq 'hasBeenPlayed = entry.key in playedVideos' "$GALLERY"
+          grep -Fq '.rotate(-38f)' "$GALLERY"
+          grep -Fq 'Slim, translucent ribbon' "$GALLERY"
+          if grep -Eq 'rememberInfiniteTransition|animateFloat' "$GALLERY"; then
+            echo "ERROR: Unwatched video ribbon must not animate"
+            exit 1
+          fi
           grep -Fq 'onVideoStarted()' "$VIEWER"
           if grep -Fq '刪除目前檔案' "$VIEWER"; then
             echo "ERROR: Delete must live in the gallery toolbar"
@@ -172,10 +178,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.16-signed.apk
+            NAME=MyPlayer-v1.1.17-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.16-debug-signed.apk
+            NAME=MyPlayer-v1.1.17-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -191,17 +197,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.16"
+          TAG="v1.1.17"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.16 · resume gallery, keep playback, mark unseen
+          # My Player v1.1.17 · subtle unseen-video corner ribbon
 
           Returning from a video preserves the gallery scroll position and
           shows the last viewed item, even after swiping between videos.
           Opening the app again restores the last visited tab, folder and
           precise list/grid scroll offset. Playback resumes from its last
           saved position; videos watched to the end restart from the start.
-          Unwatched videos show a soft animated mint badge which disappears
-          after actual playback begins. Select videos by long pressing, then
+          Unwatched videos show a slim, translucent top-left corner ribbon
+          with no animation. The ribbon disappears when playback begins.
+          Select videos by long pressing, then
           use the delete button in the gallery top bar. The fullscreen
           viewer no longer includes a delete button.
 
@@ -280,9 +287,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.16 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.17 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.16 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.17 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
