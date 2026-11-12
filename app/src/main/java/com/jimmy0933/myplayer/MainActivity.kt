@@ -114,6 +114,11 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     var playedVideos by remember {
         mutableStateOf(prefs.getStringSet("played_video_keys", emptySet())?.toSet() ?: emptySet())
     }
+    // Stable video key of the latest video that actually began playback.
+    // Unlike the pending gallery focus, this is not cleared on navigation.
+    var lastPlayedVideoKey by remember {
+        mutableStateOf(prefs.getString("last_played_video_key", null))
+    }
     var showSettings by remember { mutableStateOf(false) }
     var showFolderPicker by remember { mutableStateOf(false) }
     var operation by remember { mutableStateOf("複製") }
@@ -231,6 +236,11 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                     playedVideos = playedVideos - deletedKeys
                     val historyEditor = prefs.edit().putStringSet("played_video_keys", playedVideos)
                     deletedKeys.forEach { historyEditor.remove("resume_position_${it}") }
+                    val previousLast = lastPlayedVideoKey
+                    if (previousLast != null && previousLast in deletedKeys) {
+                        lastPlayedVideoKey = null
+                        historyEditor.remove("last_played_video_key")
+                    }
                     historyEditor.apply()
                 }
                 viewerItems = viewerItems?.filter { it.key !in deletedKeys }
@@ -360,6 +370,12 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                     onRepairMp4 = { showRepairPrompt = displayed },
                     resumePositionMs = prefs.getLong("resume_position_${displayed.key}", 0L),
                     onVideoStarted = {
+                        // Update on real playback (also when switching videos by swiping).
+                        // Keep the glow pointing to the most recently played video.
+                        if (lastPlayedVideoKey != displayed.key) {
+                            lastPlayedVideoKey = displayed.key
+                            prefs.edit().putString("last_played_video_key", displayed.key).apply()
+                        }
                         if (displayed.key !in playedVideos) {
                             val updated = playedVideos + displayed.key
                             playedVideos = updated
@@ -387,6 +403,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
             folder = folder, search = search, sort = sort, listMode = listMode,
             selected = selected, favorites = favorites,
             favoriteFolders = favoriteFolders, playedVideos = playedVideos,
+            lastPlayedVideoKey = lastPlayedVideoKey,
             focusOnReturnKey = focusOnReturn,
             onReturnFocusHandled = {
                 focusOnReturn = null
