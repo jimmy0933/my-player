@@ -118,6 +118,10 @@ object PlayerMath {
     fun progressHideDelaySeconds(value: Int): Int =
         value.takeIf { it in progressHideDelayOptions } ?: 5
 
+    /** Only the latest actually-played video may receive the gallery hover focus. */
+    fun isLastPlayedVideo(mediaKey: String, isVideo: Boolean, lastPlayedKey: String?): Boolean =
+        isVideo && lastPlayedKey != null && mediaKey == lastPlayedKey
+
     /** Resume near the last position, but restart videos already at their ending. */
     fun resumePosition(positionMs: Long, durationMs: Long): Long {
         val position = positionMs.coerceAtLeast(0L)
