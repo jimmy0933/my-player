@@ -43,6 +43,7 @@ jobs:
           GALLERY=app/src/main/java/com/jimmy0933/myplayer/GalleryScreen.kt
           VIEWER=app/src/main/java/com/jimmy0933/myplayer/ViewerScreen.kt
           OPERATIONS=app/src/main/java/com/jimmy0933/myplayer/MediaOperations.kt
+          MAIN=app/src/main/java/com/jimmy0933/myplayer/MainActivity.kt
           grep -Fq 'if (selectionMode)' "$GALLERY"
           grep -Fq 'onLongPress = { onSelect(entry) }' "$GALLERY"
           grep -Fq 'PullToRefreshBox(' "$GALLERY"
@@ -83,7 +84,6 @@ jobs:
           echo "Folder hierarchy and title contrast checks PASS"
           MANIFEST=app/src/main/AndroidManifest.xml
           EXTERNAL=app/src/main/java/com/jimmy0933/myplayer/ExternalVideoIntents.kt
-          MAIN=app/src/main/java/com/jimmy0933/myplayer/MainActivity.kt
           grep -Fq 'android.intent.action.VIEW' "$MANIFEST"
           grep -Fq 'android:scheme="content"' "$MANIFEST"
           grep -Fq 'android:mimeType="video/*"' "$MANIFEST"
