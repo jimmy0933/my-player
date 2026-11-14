@@ -59,6 +59,12 @@ jobs:
           grep -Fq 'if (media.isVideo) {' "$VIEWER"
           grep -Fq 'onFileAction("移動")' "$GALLERY"
           grep -Fq 'onFileAction("刪除")' "$GALLERY"
+          grep -Fq 'deleteQueue = items.distinctBy { it.key }' "$MAIN"
+          grep -Fq 'MediaStore.createDeleteRequest(' "$MAIN"
+          if grep -Fq 'deleteConfirmation' "$MAIN"; then
+            echo "ERROR: In-app delete confirmation causes a second prompt"
+            exit 1
+          fi
           grep -Fq 'onFavoriteSelection()' "$GALLERY"
           if grep -Eq 'PlayerTransportButton|PlayerPlayButton' "$VIEWER"; then
             echo "ERROR: Bottom transport buttons must not block the video"
@@ -191,10 +197,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.19-signed.apk
+            NAME=MyPlayer-v1.1.20-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.19-debug-signed.apk
+            NAME=MyPlayer-v1.1.20-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -210,9 +216,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.19"
+          TAG="v1.1.20"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.19 · last-played hover highlight
+          # My Player v1.1.20 · single delete confirmation
+
+          Removed the extra My Player delete confirmation. Tapping Delete
+          in the selected-media toolbar goes directly to Android's native
+          confirmation, retaining safe permission and deletion checks.
 
           A gentle animated outline and light lift now show the last played
           video across grid and list views. The selection remains after
@@ -308,9 +318,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.19 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.20 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.19 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.20 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
