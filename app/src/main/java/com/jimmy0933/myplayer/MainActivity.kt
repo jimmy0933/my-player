@@ -123,7 +123,6 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     var showFolderPicker by remember { mutableStateOf(false) }
     var operation by remember { mutableStateOf("複製") }
     var operationItems by remember { mutableStateOf(emptyList<LocalMedia>()) }
-    var deleteConfirmation by remember { mutableStateOf<List<LocalMedia>?>(null) }
     var deleteQueue by remember { mutableStateOf(emptyList<LocalMedia>()) }
     var activeDelete by remember { mutableStateOf(emptyList<LocalMedia>()) }
     var moveQueue by remember { mutableStateOf(emptyList<LocalMedia>()) }
@@ -215,8 +214,10 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     }
 
     fun requestDelete(items: List<LocalMedia>) {
-        if (items.isEmpty()) return
-        deleteConfirmation = items.distinctBy { it.key }
+        if (items.isEmpty() || deleteQueue.isNotEmpty() || activeDelete.isNotEmpty()) return
+        // Android's MediaStore permission sheet is the only confirmation.
+        // Do not show an additional in-app delete confirmation dialog.
+        deleteQueue = items.distinctBy { it.key }
     }
 
     val deleteLauncher = rememberLauncherForActivityResult(
@@ -505,23 +506,6 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
             },
             confirmButton = {
                 TextButton(onClick = { operationErrors = emptyList() }) { Text("關閉") }
-            }
-        )
-    }
-
-    deleteConfirmation?.let { files ->
-        AlertDialog(
-            onDismissRequest = { deleteConfirmation = null },
-            title = { Text("確認永久刪除？") },
-            text = { Text("即將要求 Android 刪除 ${files.size} 個原始檔案。刪除無法從 My Player 復原。\n\nAndroid 可能依授權狀態另外顯示確認視窗。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    deleteQueue = files
-                    deleteConfirmation = null
-                }) { Text("確認刪除", color = Color(0xFFFF9DA6)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteConfirmation = null }) { Text("保留檔案") }
             }
         )
     }
