@@ -423,13 +423,6 @@ fun ViewerScreen(
         if (media.isVideo && controlsVisible) {
             Column(
                 Modifier.fillMaxWidth().align(Alignment.BottomCenter)
-                    .then(
-                        if (controlsVisible) Modifier.background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = .70f))
-                            )
-                        ) else Modifier
-                    )
                     .navigationBarsPadding()
                     .padding(horizontal = if (isLandscape) 8.dp else 10.dp)
                     // Increase touch area toward the system navigation bar while
