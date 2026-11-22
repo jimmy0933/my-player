@@ -38,6 +38,13 @@ class PlayerMathTest {
         assertEquals(30_000L, PlayerMath.doubleTapSeekPosition(30_000L, 0, 90_000L))
     }
 
+    @Test fun progressBottomOffsetIsClamped() {
+        assertEquals(0f, PlayerMath.progressBottomOffsetDp(-5f))
+        assertEquals(0f, PlayerMath.progressBottomOffsetDp(Float.NaN))
+        assertEquals(60f, PlayerMath.progressBottomOffsetDp(60f))
+        assertEquals(200f, PlayerMath.progressBottomOffsetDp(999f))
+    }
+
     @Test fun progressAutoHideDelayOptions() {
         assertEquals(listOf(1, 2, 3, 5, 10, 15, 30, 0), PlayerMath.progressHideDelayOptions)
         assertEquals(5, PlayerMath.progressHideDelaySeconds(-1))

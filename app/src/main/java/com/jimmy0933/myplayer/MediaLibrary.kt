@@ -118,6 +118,11 @@ object PlayerMath {
     fun progressHideDelaySeconds(value: Int): Int =
         value.takeIf { it in progressHideDelayOptions } ?: 5
 
+    /** Extra distance (dp) between the progress bar and the bottom edge. */
+    const val PROGRESS_MAX_BOTTOM_OFFSET_DP = 200f
+    fun progressBottomOffsetDp(value: Float): Float =
+        if (value.isNaN()) 0f else value.coerceIn(0f, PROGRESS_MAX_BOTTOM_OFFSET_DP)
+
     /** Only the latest actually-played video may receive the gallery hover focus. */
     fun isLastPlayedVideo(mediaKey: String, isVideo: Boolean, lastPlayedKey: String?): Boolean =
         isVideo && lastPlayedKey != null && mediaKey == lastPlayedKey

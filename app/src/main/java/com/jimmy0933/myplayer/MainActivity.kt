@@ -134,6 +134,9 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
     var showRepairPrompt by remember { mutableStateOf<LocalMedia?>(null) }
     var progressSize by remember { mutableFloatStateOf(PlayerMath.progressScale(prefs.getFloat("progress_size", 1f))) }
     var progressOpacity by remember { mutableFloatStateOf(PlayerMath.progressOpacity(prefs.getFloat("progress_opacity", .72f))) }
+    var progressBottomOffset by remember {
+        mutableFloatStateOf(PlayerMath.progressBottomOffsetDp(prefs.getFloat("progress_bottom_offset", 0f)))
+    }
     var progressHideDelay by remember {
         mutableIntStateOf(PlayerMath.progressHideDelaySeconds(prefs.getInt("progress_hide_delay_seconds", 5)))
     }
@@ -392,6 +395,7 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
                     onPlaybackSettings = { showSettings = true },
                     progressScale = progressSize, progressOpacity = progressOpacity,
                     progressHideDelaySeconds = progressHideDelay,
+                    progressBottomOffsetDp = progressBottomOffset,
                     isExternalVideo = openedExternally
                 )
             }
@@ -539,15 +543,18 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
         PlaybackSettingsDialog(
             size = progressSize, opacity = progressOpacity,
             hideDelaySeconds = progressHideDelay,
+            bottomOffset = progressBottomOffset,
             canManage = Build.VERSION.SDK_INT >= 31 && MediaStore.canManageMedia(context),
             onDismiss = { showSettings = false },
-            onSave = { size, opacity, delay ->
+            onSave = { size, opacity, delay, offset ->
+                progressBottomOffset = PlayerMath.progressBottomOffsetDp(offset)
                 progressSize = PlayerMath.progressScale(size)
                 progressOpacity = PlayerMath.progressOpacity(opacity)
                 progressHideDelay = PlayerMath.progressHideDelaySeconds(delay)
                 prefs.edit().putFloat("progress_size", progressSize)
                     .putFloat("progress_opacity", progressOpacity)
                     .putInt("progress_hide_delay_seconds", progressHideDelay)
+                    .putFloat("progress_bottom_offset", progressBottomOffset)
                     .remove("progress_width").apply()
                 showSettings = false
             },
@@ -563,9 +570,10 @@ private fun MyPlayerApp(externalRequest: ExternalVideoRequest?) {
 
 @Composable
 private fun PlaybackSettingsDialog(
-    size: Float, opacity: Float, hideDelaySeconds: Int, canManage: Boolean,
+    size: Float, opacity: Float, hideDelaySeconds: Int, bottomOffset: Float,
+    canManage: Boolean,
     onDismiss: () -> Unit,
-    onSave: (Float, Float, Int) -> Unit,
+    onSave: (Float, Float, Int, Float) -> Unit,
     onRequestManage: () -> Unit
 ) {
     var scale by remember(size) { mutableFloatStateOf(size) }
@@ -574,6 +582,7 @@ private fun PlaybackSettingsDialog(
     // The control now moves in the intuitive direction: further right means
     // more transparent. Persisted values remain opacity for compatibility.
     var transparency by remember(opacity) { mutableFloatStateOf(1f - opacity) }
+    var offset by remember(bottomOffset) { mutableFloatStateOf(bottomOffset) }
     var previewProgress by remember { mutableFloatStateOf(.4f) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -611,6 +620,12 @@ private fun PlaybackSettingsDialog(
                     onValueChange = { transparency = it },
                     valueRange = 0f.. .85f
                 )
+                Text("進度條位置（離底部）：${offset.toInt()} dp")
+                Slider(
+                    value = offset,
+                    onValueChange = { offset = it },
+                    valueRange = 0f..PlayerMath.PROGRESS_MAX_BOTTOM_OFFSET_DP
+                )
                 Text(
                     "實際進度線預覽（可拖動）",
                     color = UiColors.Subtle, style = MaterialTheme.typography.bodySmall
@@ -636,10 +651,10 @@ private fun PlaybackSettingsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(scale, 1f - transparency, hideDelay) }) { Text("儲存") }
+            TextButton(onClick = { onSave(scale, 1f - transparency, hideDelay, offset) }) { Text("儲存") }
         },
         dismissButton = {
-            TextButton(onClick = { onSave(1f, .72f, 5) }) { Text("恢復預設") }
+            TextButton(onClick = { onSave(1f, .72f, 5, 0f) }) { Text("恢復預設") }
         }
     )
 }

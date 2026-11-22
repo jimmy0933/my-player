@@ -65,6 +65,7 @@ fun ViewerScreen(
     progressScale: Float,
     progressOpacity: Float,
     progressHideDelaySeconds: Int,
+    progressBottomOffsetDp: Float = 0f,
     isExternalVideo: Boolean = false
 ) {
     val context = LocalContext.current
@@ -429,7 +430,8 @@ fun ViewerScreen(
                     // preserving the progress line's center at its old position.
                     .padding(
                         top = 2.dp,
-                        bottom = if (isLandscape) 6.dp else 10.dp
+                        bottom = (if (isLandscape) 6.dp else 10.dp) +
+                            PlayerMath.progressBottomOffsetDp(progressBottomOffsetDp).dp
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
