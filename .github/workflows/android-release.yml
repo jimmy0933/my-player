@@ -48,7 +48,7 @@ jobs:
           grep -Fq 'onLongPress = { onSelect(entry) }' "$GALLERY"
           grep -Fq 'PullToRefreshBox(' "$GALLERY"
           grep -Fq 'progressThicknessDp(size)' "$VIEWER"
-          grep -Fq 'bottom = if (isLandscape) 6.dp else 10.dp' "$VIEWER"
+          grep -Fq 'bottom = (if (isLandscape) 6.dp else 10.dp) +' "$VIEWER"
           grep -Fq 'touchHeight = if (isLandscape) 80.dp else 104.dp' "$VIEWER"
           grep -Fq 'val actualTargets = remember(destination, entries)' "$GALLERY"
           grep -Fq 'listOf("DCIM", "Movies", "Pictures")' "$OPERATIONS"
