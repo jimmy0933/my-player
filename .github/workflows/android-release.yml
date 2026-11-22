@@ -197,10 +197,10 @@ jobs:
           MODE="${{ steps.signing.outputs.mode }}"
           if [[ "$MODE" == "release" ]]; then
             SRC=app/build/outputs/apk/release/app-release.apk
-            NAME=MyPlayer-v1.1.21-signed.apk
+            NAME=MyPlayer-v1.1.22-signed.apk
           else
             SRC=app/build/outputs/apk/debug/app-debug.apk
-            NAME=MyPlayer-v1.1.21-debug-signed.apk
+            NAME=MyPlayer-v1.1.22-debug-signed.apk
           fi
           test -s "$SRC"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$SRC"
@@ -216,9 +216,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.1.21"
+          TAG="v1.1.22"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          # My Player v1.1.21 · remove dark scrim behind progress bar
+          # My Player v1.1.22 · progress bar position setting
+
+          Added a progress bar position setting in Player settings: choose
+          how far the timeline sits above the bottom edge (0-200 dp).
 
           Fixed the video progress bar area turning dark while controls are
           visible: the black gradient behind the timeline was removed.
@@ -321,9 +324,9 @@ jobs:
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
-            gh release edit "$TAG" --title "My Player v1.1.21 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$TAG" --title "My Player v1.1.22 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$TAG" dist/*.apk --title "My Player v1.1.21 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release create "$TAG" dist/*.apk --title "My Player v1.1.22 · rebuilt" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name' | while IFS= read -r old_tag; do
             if [[ -n "$old_tag" && "$old_tag" != "$TAG" ]]; then
